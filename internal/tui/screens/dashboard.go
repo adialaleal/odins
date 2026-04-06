@@ -123,7 +123,7 @@ func (m DashboardModel) Update(msg tea.Msg) (DashboardModel, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-// View renders the dashboard.
+// View renders the dashboard content (no footer — footer is rendered by app.go).
 func (m DashboardModel) View() string {
 	titleBar := components.TitleBar(m.width,
 		"Dashboard — Rotas Ativas",
@@ -133,16 +133,6 @@ func (m DashboardModel) View() string {
 	tableView := lipgloss.NewStyle().
 		Padding(0, 2).
 		Render(m.table.View())
-
-	hints := []components.KeyHint{
-		{Key: "a", Desc: "adicionar"},
-		{Key: "u", Desc: "odins up"},
-		{Key: "d", Desc: "remover"},
-		{Key: "s", Desc: "settings"},
-		{Key: "l", Desc: "logs"},
-		{Key: "q", Desc: "sair"},
-	}
-	footer := components.Footer(m.width, hints)
 
 	content := lipgloss.JoinVertical(lipgloss.Left,
 		titleBar,
@@ -154,7 +144,18 @@ func (m DashboardModel) View() string {
 		content = lipgloss.JoinVertical(lipgloss.Left, content, "", overlay)
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, content, footer)
+	return content
+}
+
+// SetContentHeight sizes the table to fit exactly the available content height.
+// contentH = terminal height minus header, footer, status bar, and titleBar lines.
+func (m *DashboardModel) SetContentHeight(contentH int) {
+	// subtract: 1 (titleBar) + 1 (table header row) + 1 (border under header)
+	tableH := contentH - 3
+	if tableH < 1 {
+		tableH = 1
+	}
+	m.table.SetHeight(tableH)
 }
 
 // SetRoutes updates the route list and refreshes the table.
