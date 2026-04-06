@@ -101,9 +101,14 @@ func runUp(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	domain := projCfg.Project.Domain
+	if domain != "" {
+		fmt.Printf("  → Domínio: %s.%s\n", domain, cfg.TLD)
+	}
+
 	applied := 0
 	for _, rc := range projCfg.Routes {
-		fqdn := buildFQDN(rc.Subdomain, projCfg.Project.Name, cfg.TLD)
+		fqdn := buildFQDN(rc.Subdomain, domain, projCfg.Project.Name, cfg.TLD)
 
 		r := state.Route{
 			ID:              "odins-" + fqdn,
@@ -111,6 +116,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 			Port:            rc.Port,
 			Project:         projCfg.Project.Name,
 			Runtime:         projCfg.Project.Runtime,
+			Domain:          domain,
 			DockerContainer: rc.DockerContainer,
 			HTTPS:           rc.HTTPS,
 			CreatedAt:       time.Now(),
@@ -135,14 +141,24 @@ func runUp(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Regenerate landing page if this project is attached to a domain
+	if domain != "" {
+		regeneratePageForDomain(cfg, store, domain)
+		fmt.Printf("  → Landing page atualizada: https://%s.%s\n", domain, cfg.TLD)
+	}
+
 	fmt.Printf("\n  %d rota(s) ativada(s) para '%s'\n", applied, projCfg.Project.Name)
 	return nil
 }
 
-// buildFQDN constructs the full subdomain.
-// If the route subdomain already contains a dot (e.g. "api.rankly"),
-// it is used as-is with TLD appended. Otherwise: subdomain.project.tld.
-func buildFQDN(subdomain, project, tld string) string {
+// buildFQDN constructs the full FQDN for a route.
+//   - If domain is set:    subdomain.domain.tld   (e.g. web.tatoh.odins)
+//   - If subdomain has a dot: subdomain.tld        (e.g. api.rankly.odins)
+//   - Otherwise:           subdomain.project.tld   (e.g. web.rankly_web.odins)
+func buildFQDN(subdomain, domain, project, tld string) string {
+	if domain != "" {
+		return subdomain + "." + domain + "." + tld
+	}
 	for _, c := range subdomain {
 		if c == '.' {
 			return subdomain + "." + tld

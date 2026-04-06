@@ -405,7 +405,7 @@ func odinsUpCmd(cfg config.GlobalConfig, store *state.Store) tea.Cmd {
 		}
 
 		var routes []config.RouteConfig
-		var projName, projRuntime string
+		var projName, projRuntime, projDomain string
 
 		projectCfgPath := filepath.Join(cwd, config.ProjectConfigFile)
 
@@ -417,6 +417,7 @@ func odinsUpCmd(cfg config.GlobalConfig, store *state.Store) tea.Cmd {
 			routes = projCfg.Routes
 			projName = projCfg.Project.Name
 			projRuntime = projCfg.Project.Runtime
+			projDomain = projCfg.Project.Domain
 		} else {
 			d := detect.Project(cwd)
 			if d.Runtime == "unknown" {
@@ -435,13 +436,14 @@ func odinsUpCmd(cfg config.GlobalConfig, store *state.Store) tea.Cmd {
 
 		applied := 0
 		for _, rc := range routes {
-			fqdn := tuiUpFQDN(rc.Subdomain, projName, cfg.TLD)
+			fqdn := tuiUpFQDN(rc.Subdomain, projDomain, projName, cfg.TLD)
 			r := state.Route{
 				ID:              "odins-" + fqdn,
 				Subdomain:       fqdn,
 				Port:            rc.Port,
 				Project:         projName,
 				Runtime:         projRuntime,
+				Domain:          projDomain,
 				DockerContainer: rc.DockerContainer,
 				HTTPS:           rc.HTTPS,
 				CreatedAt:       time.Now(),
@@ -457,7 +459,10 @@ func odinsUpCmd(cfg config.GlobalConfig, store *state.Store) tea.Cmd {
 	}
 }
 
-func tuiUpFQDN(subdomain, project, tld string) string {
+func tuiUpFQDN(subdomain, domain, project, tld string) string {
+	if domain != "" {
+		return subdomain + "." + domain + "." + tld
+	}
 	for _, c := range subdomain {
 		if c == '.' {
 			return subdomain + "." + tld

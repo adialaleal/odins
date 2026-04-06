@@ -137,6 +137,42 @@ func (b *Backend) RemoveRoute(subdomain string) error {
 	return nil
 }
 
+// AddDomain registers a static landing page route for a domain in Caddy.
+// pageDir is the directory containing index.html (e.g. ~/.local/share/odins/pages/tatoh).
+func (b *Backend) AddDomain(hostname, pageDir string) error {
+	route := buildDomainRoute(hostname, pageDir)
+	data, err := json.Marshal(route)
+	if err != nil {
+		return err
+	}
+	if err := b.post("/config/apps/http/servers/srv0/routes/...", data); err != nil {
+		if initErr := b.initBase(); initErr != nil {
+			return fmt.Errorf("caddy init base: %w (original: %v)", initErr, err)
+		}
+		return b.post("/config/apps/http/servers/srv0/routes/...", data)
+	}
+	return nil
+}
+
+// RemoveDomain deletes the landing page route for a domain from Caddy.
+func (b *Backend) RemoveDomain(hostname string) error {
+	id := "odins-domain-" + hostname
+	req, err := http.NewRequest(http.MethodDelete, b.AdminAddr+"/id/"+id, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := b.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 && resp.StatusCode != 204 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("caddy API delete domain failed (%d): %s", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
 // Reload applies any pending config changes.
 func (b *Backend) Reload() error {
 	// Caddy API changes are applied instantly; reload is a no-op here.
