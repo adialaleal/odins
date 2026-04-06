@@ -50,7 +50,7 @@ func DefaultGlobalConfig() GlobalConfig {
 	return GlobalConfig{
 		TLD:          "odin",
 		ProxyBackend: BackendCaddy,
-		DnsmasqPort:  5353,
+		DnsmasqPort:  5300,
 		CaddyAdmin:   "http://localhost:2019",
 		HTTPPort:     80,
 		HTTPSPort:    443,

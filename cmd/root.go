@@ -3,8 +3,12 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/adialaleal/odins/internal/config"
+	"github.com/adialaleal/odins/internal/page"
+	"github.com/adialaleal/odins/internal/proxy/caddy"
+	"github.com/adialaleal/odins/internal/state"
 	"github.com/adialaleal/odins/internal/tui"
 	"github.com/spf13/cobra"
 )
@@ -25,6 +29,12 @@ with automatic HTTPS. Works with Node.js, Go, Python, Docker, and more.
   odins kill <domain>     — remove a route
   odins welcome           — onboarding guide
   odins                   — open the TUI dashboard`,
+	// Sync Caddy from persisted state before every command so routes
+	// survive Caddy restarts without requiring the user to re-run odins up.
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		syncCaddyFromState()
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, err := config.LoadGlobal()
 		cwd, _ := os.Getwd()
@@ -47,6 +57,35 @@ with automatic HTTPS. Works with Node.js, Go, Python, Docker, and more.
 
 		return tui.Run()
 	},
+}
+
+// syncCaddyFromState re-applies all routes and domain landing pages from the
+// persisted store into Caddy. This is a no-op when Caddy is not running or
+// the proxy backend is not Caddy. It ensures routes survive Caddy restarts.
+func syncCaddyFromState() {
+	cfg, err := config.LoadGlobal()
+	if err != nil || cfg.ProxyBackend != config.BackendCaddy {
+		return
+	}
+	c := caddy.New()
+	if !c.IsRunning() {
+		return
+	}
+	store, err := state.Load()
+	if err != nil {
+		return
+	}
+	// Build domain → page-dir map
+	domainPages := make(map[string]string)
+	for _, d := range store.Domains {
+		dir := filepath.Join(page.PagesDir(), d.Name)
+		hostname := d.Name + "." + cfg.TLD
+		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+			domainPages[hostname] = dir
+		}
+	}
+	// Fire-and-forget: sync failures are non-fatal (Caddy may have routes already)
+	_ = c.SyncRoutes(store.Routes, domainPages)
 }
 
 // SetVersion wires version info injected by GoReleaser into the Cobra root command.

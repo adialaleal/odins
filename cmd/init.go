@@ -3,8 +3,9 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"os/exec"
+	pathpkg "path/filepath"
 	"strings"
+	"time"
 
 	"github.com/adialaleal/odins/internal/cert"
 	"github.com/adialaleal/odins/internal/config"
@@ -26,7 +27,9 @@ It will:
   2. Ask which TLD and proxy backend you want
   3. Configure DNS wildcard resolution (one sudo prompt)
   4. Set up HTTPS with a trusted local certificate
-  5. Start all services`,
+  5. Start all services
+
+Run again at any time to repair or reconfigure.`,
 	RunE: runInit,
 }
 
@@ -58,24 +61,21 @@ func runInit(cmd *cobra.Command, args []string) error {
 	backend := chooseBackend()
 	fmt.Printf("  → Proxy escolhido: %s\n\n", backend)
 
-	// Step 4: Install dnsmasq
-	step(4, "Instalando dnsmasq")
+	// Step 4: Install and configure dnsmasq
+	step(4, "Configurando dnsmasq")
 	if err := brew.Install("dnsmasq"); err != nil {
 		return err
 	}
-	if err := dns.GenerateConfig([]string{tld}, 5353); err != nil {
+	if err := dns.GenerateConfig([]string{tld}, 5300); err != nil {
 		return err
-	}
-	if err := dns.LinkConfig(); err != nil {
-		fmt.Printf("  ⚠  Não foi possível linkar config dnsmasq: %v\n", err)
 	}
 	if err := brew.ServiceRestart("dnsmasq"); err != nil {
-		return err
+		fmt.Printf("  ⚠  dnsmasq restart: %v\n", err)
 	}
 	ok()
 
-	// Step 5: Install proxy
-	step(5, fmt.Sprintf("Instalando %s", backend))
+	// Step 5: Install and configure proxy
+	step(5, fmt.Sprintf("Configurando %s", backend))
 	var proxyFormula string
 	switch backend {
 	case "nginx":
@@ -88,26 +88,49 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if err := brew.Install(proxyFormula); err != nil {
 		return err
 	}
-	if err := brew.ServiceStart(proxyFormula); err != nil {
-		fmt.Printf("  ⚠  %s start: %v\n", proxyFormula, err)
+
+	// For Caddy: create the Caddyfile BEFORE starting the brew service.
+	// The plist runs: caddy run --config /opt/homebrew/etc/Caddyfile
+	// Without this file caddy crash-loops immediately.
+	if proxyFormula == "caddy" {
+		if err := ensureCaddyfile(); err != nil {
+			fmt.Printf("  ⚠  criar Caddyfile: %v\n", err)
+		}
+	}
+
+	if err := brew.ServiceRestart(proxyFormula); err != nil {
+		fmt.Printf("  ⚠  %s restart: %v\n", proxyFormula, err)
+	}
+
+	// Wait for Caddy admin API to be ready (up to 10s)
+	if proxyFormula == "caddy" {
+		waitForCaddyAPI()
 	}
 	ok()
 
 	// Step 6: Write /etc/resolver/<tld> via sudo
-	step(6, fmt.Sprintf("Configurando /etc/resolver/%s (requer sudo)", tld))
-	fmt.Printf("  → ODINS precisa de acesso root para criar /etc/resolver/%s\n", tld)
+	step(6, fmt.Sprintf("Configurando /etc/resolver/%s", tld))
+	fmt.Printf("  → Uma janela de autenticação será aberta para criar /etc/resolver/%s\n", tld)
 	fmt.Println("  → Isso permite que seu Mac resolva *."+tld+" para 127.0.0.1")
 	fmt.Println()
-	if err := helper.SudoWriteResolver(tld, 5353); err != nil {
+	if err := helper.SudoWriteResolver(tld, 5300); err != nil {
 		return fmt.Errorf("write resolver: %w", err)
 	}
+	// Flush macOS DNS cache so the new resolver takes effect immediately
+	helper.SudoFlushDNS()
 	ok()
 
 	// Step 7: Trust HTTPS certificate
 	step(7, "Configurando HTTPS local")
 	if backend == "caddy" {
-		// Caddy needs to be running first to generate its CA
-		fmt.Println("  → Iniciando Caddy e aguardando CA ser gerada...")
+		// Push ODINS base config to Caddy (TLS internal)
+		caddyClient := caddy.New()
+		if err := caddyClient.Init(tld); err != nil {
+			fmt.Printf("  ⚠  Caddy config init: %v\n", err)
+		}
+
+		// Wait for Caddy to generate its internal CA
+		fmt.Println("  → Aguardando Caddy gerar CA local...")
 		waitForCaddyCA()
 		caPath := cert.CaddyCAPath()
 		if caPath != "" {
@@ -120,12 +143,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 			}
 		} else {
 			fmt.Println("  ⚠  CA do Caddy ainda não gerada — abra um domínio no browser para ativá-la")
-		}
-
-		// Init Caddy with base config
-		caddyClient := caddy.New()
-		if err := caddyClient.Init(tld); err != nil {
-			fmt.Printf("  ⚠  Caddy config init: %v\n", err)
+			ok()
 		}
 	} else {
 		// Use mkcert for nginx/apache
@@ -136,8 +154,6 @@ func runInit(cmd *cobra.Command, args []string) error {
 				ok()
 			}
 		}
-
-		// Init nginx include directory
 		if backend == "nginx" {
 			nginx.New().Init()
 		} else {
@@ -148,12 +164,13 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// Step 8: Save config
 	step(8, "Salvando configuração")
 	cfg := config.GlobalConfig{
-		TLD:          tld,
-		ProxyBackend: config.ProxyBackend(backend),
-		DnsmasqPort:  5353,
-		CaddyAdmin:   "http://localhost:2019",
-		HTTPPort:     80,
-		HTTPSPort:    443,
+		TLD:            tld,
+		ProxyBackend:   config.ProxyBackend(backend),
+		DnsmasqPort:    5300,
+		CaddyAdmin:     "http://localhost:2019",
+		HTTPPort:       80,
+		HTTPSPort:      443,
+		OnboardingDone: true,
 	}
 	if err := config.SaveGlobal(cfg); err != nil {
 		return err
@@ -167,12 +184,43 @@ func runInit(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Domínios disponíveis: https://<projeto>.%s\n", tld)
 	fmt.Println()
 	fmt.Println("  Próximos passos:")
-	fmt.Printf("    cd meu-projeto && odins up     # detecta e cria as rotas\n")
-	fmt.Printf("    odins add api.projeto.%s --port 3000\n", tld)
+	fmt.Printf("    odins domain add meu-projeto   # criar workspace\n")
+	fmt.Printf("    cd meu-projeto && odins up      # detecta e cria as rotas\n")
 	fmt.Printf("    odins                           # abrir TUI\n")
 	fmt.Println()
 
 	return nil
+}
+
+// ensureCaddyfile creates a minimal Caddyfile so that `brew services start caddy`
+// does not crash-loop. The file just enables the admin API on localhost:2019.
+// ODINS manages all routes via the API — the Caddyfile itself stays minimal.
+func ensureCaddyfile() error {
+	candidates := []string{
+		"/opt/homebrew/etc/Caddyfile",
+		"/usr/local/etc/Caddyfile",
+	}
+	for _, path := range candidates {
+		if _, err := os.Stat(pathpkg.Dir(path)); err == nil {
+			if _, err := os.Stat(path); os.IsNotExist(err) {
+				content := "{\n\tadmin localhost:2019\n}\n"
+				return os.WriteFile(path, []byte(content), 0644)
+			}
+			return nil // already exists — don't overwrite user customisation
+		}
+	}
+	return fmt.Errorf("Homebrew etc directory not found")
+}
+
+// waitForCaddyAPI blocks until Caddy's admin API is responsive (max 10s).
+func waitForCaddyAPI() {
+	caddyClient := caddy.New()
+	for i := 0; i < 20; i++ {
+		if caddyClient.IsRunning() {
+			return
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
 }
 
 func chooseTLD() string {
@@ -237,12 +285,11 @@ func ok() {
 }
 
 func waitForCaddyCA() {
-	// Wait up to 10s for Caddy to generate its CA
 	for i := 0; i < 20; i++ {
 		if cert.CaddyCAPath() != "" {
 			return
 		}
-		exec.Command("sleep", "0.5").Run()
+		time.Sleep(500 * time.Millisecond)
 	}
 }
 
