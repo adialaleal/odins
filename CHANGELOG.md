@@ -9,6 +9,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [0.8.0] - 2026-04-06
+
 ### Added
 - `odins detect` for read-only project inspection and `.odins` recommendation
 - `odins doctor` for local environment diagnostics
@@ -17,6 +21,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - AI-friendly docs under `docs/ai/`
 - Published adapters for Codex, Claude Code, and Antigravity
 - Detection fixtures, JSON golden tests, and AI pack sync checks
+
+### Changed
+- The AI-friendly CLI flow now preserves the production runtime fixes from `v0.7.0`, including dnsmasq on port `5300`, Caddy bootstrap before service start, macOS DNS flush after resolver changes, and automatic Caddy route sync from persisted state.
 
 ---
 
