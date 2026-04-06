@@ -23,7 +23,8 @@ import (
 type Screen int
 
 const (
-	ScreenDashboard Screen = iota
+	ScreenSplash Screen = iota
+	ScreenDashboard
 	ScreenAddRoute
 	ScreenSettings
 	ScreenLogs
@@ -40,6 +41,7 @@ type AppModel struct {
 	transActive bool
 
 	// sub-models
+	splash    screens.SplashModel
 	dashboard screens.DashboardModel
 	addRoute  screens.AddRouteModel
 	settings  screens.SettingsModel
@@ -85,13 +87,14 @@ func Run() error {
 	}
 
 	m := AppModel{
-		screen: ScreenDashboard,
+		screen: ScreenSplash,
 		cfg:    cfg,
 		store:  store,
 		status: autoStatus,
 	}
 
 	// Initialize sub-models with placeholder size (updated on WindowSizeMsg)
+	m.splash = screens.NewSplash(80, 24)
 	m.dashboard = screens.NewDashboard(store.Routes, 80, 24)
 	m.settings = screens.NewSettings(cfg, 80, 24)
 	m.logs = screens.NewLogs(logPath, 80, 24)
@@ -104,6 +107,7 @@ func Run() error {
 // Init starts all sub-model inits.
 func (m AppModel) Init() tea.Cmd {
 	return tea.Batch(
+		m.splash.Init(),
 		m.dashboard.Init(),
 		m.logs.Init(),
 	)
@@ -117,11 +121,23 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		var splashCmd tea.Cmd
+		m.splash, splashCmd = m.splash.Update(msg)
+		cmds = append(cmds, splashCmd)
 		m.dashboard.SetSize(m.width, m.height)
 		m.logs.SetSize(m.width, m.height)
+		return m, tea.Batch(cmds...)
+
+	case screens.SplashDoneMsg:
+		m.screen = ScreenDashboard
 		return m, nil
 
 	case tea.KeyMsg:
+		// Dismiss splash immediately on any key press
+		if m.screen == ScreenSplash {
+			m.screen = ScreenDashboard
+			return m, nil
+		}
 		// Global key handlers
 		switch msg.String() {
 		case "ctrl+c", "q":
@@ -178,6 +194,10 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Delegate to active screen
 	switch m.screen {
+	case ScreenSplash:
+		var cmd tea.Cmd
+		m.splash, cmd = m.splash.Update(msg)
+		cmds = append(cmds, cmd)
 	case ScreenDashboard:
 		var cmd tea.Cmd
 		m.dashboard, cmd = m.dashboard.Update(msg)
@@ -201,6 +221,11 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the current screen with optional slide-up transition.
 func (m AppModel) View() string {
+	// Splash renders full-screen; skip header/status/footer wrapping.
+	if m.screen == ScreenSplash {
+		return m.splash.View()
+	}
+
 	var screenView string
 
 	switch m.screen {
