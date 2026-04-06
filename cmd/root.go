@@ -4,10 +4,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/adialaleal/odins/internal/config"
+	"github.com/adialaleal/odins/internal/page"
+	"github.com/adialaleal/odins/internal/proxy/caddy"
 	"github.com/adialaleal/odins/internal/service"
+	"github.com/adialaleal/odins/internal/state"
 	"github.com/adialaleal/odins/internal/tui"
 	"github.com/spf13/cobra"
 )
@@ -21,15 +25,21 @@ Stop fighting with ports. Route your local projects to beautiful subdomains
 with automatic HTTPS. Works with Node.js, Go, Python, Docker, and more.
 
   odins init              — one-time setup (DNS, proxy, HTTPS)
-  odins domain add tatoh  — criar workspace tatoh.odins
+  odins detect            — inspect a project and recommend a .odins file
+  odins doctor            — diagnose DNS, proxy, HTTPS, and local state
+  odins domain add <proj> — create workspace <proj>.odin
   odins up                — read .odins config and apply routes
   odins add <domain>      — add a single route
   odins ls                — list active routes
   odins kill <domain>     — remove a route
-  odins welcome           — guia de onboarding
+  odins welcome           — onboarding guide
   odins                   — open the TUI dashboard`,
 	SilenceErrors: true,
 	SilenceUsage:  true,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		syncCaddyFromState()
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if outputJSON {
 			return service.InvalidInput("modo TUI indisponível com --json; use um subcomando como `odins detect --json` ou `odins ls --json`")
@@ -38,15 +48,50 @@ with automatic HTTPS. Works with Node.js, Go, Python, Docker, and more.
 			return cmd.Help()
 		}
 
-		// First-run detection: show welcome before TUI if never onboarded.
 		cfg, err := config.LoadGlobal()
-		if err == nil && !cfg.OnboardingDone {
-			if err := showWelcome(true); err != nil {
+		cwd, _ := os.Getwd()
+		noProject := !config.ExistsProject(cwd)
+
+		if err == nil && (!cfg.OnboardingDone || noProject) {
+			firstRun := !cfg.OnboardingDone
+			if err := showWelcome(firstRun); err != nil {
 				return err
 			}
+			if noProject && !config.ExistsProject(cwd) {
+				return nil
+			}
 		}
+
 		return tui.Run()
 	},
+}
+
+func syncCaddyFromState() {
+	cfg, err := config.LoadGlobal()
+	if err != nil || cfg.ProxyBackend != config.BackendCaddy {
+		return
+	}
+
+	client := caddy.New()
+	if !client.IsRunning() {
+		return
+	}
+
+	store, err := state.Load()
+	if err != nil {
+		return
+	}
+
+	domainPages := make(map[string]string)
+	for _, domain := range store.Domains {
+		dir := filepath.Join(page.PagesDir(), domain.Name)
+		hostname := domain.Name + "." + cfg.TLD
+		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+			domainPages[hostname] = dir
+		}
+	}
+
+	_ = client.SyncRoutes(store.Routes, domainPages)
 }
 
 // SetVersion wires version info injected by GoReleaser into the Cobra root command.
@@ -129,6 +174,7 @@ func resetCLIState() {
 	addDomain = ""
 	addNoHTTPS = false
 	upDir = ""
+	upGlobal = false
 	domainTitle = ""
 	domainDesc = ""
 	detectDir = ""

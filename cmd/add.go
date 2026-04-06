@@ -30,7 +30,7 @@ func init() {
 	addCmd.Flags().IntVarP(&addPort, "port", "p", 0, "Local port to proxy (required)")
 	addCmd.Flags().StringVarP(&addDocker, "docker", "d", "", "Docker container name")
 	addCmd.Flags().StringVar(&addProject, "project", "", "Project name (inferred from subdomain if not set)")
-	addCmd.Flags().StringVar(&addDomain, "domain", "", "Domain workspace (e.g. tatoh → tatoh.odins)")
+	addCmd.Flags().StringVar(&addDomain, "domain", "", "Domain workspace (e.g. tatoh → project.odins)")
 	addCmd.Flags().BoolVar(&addNoHTTPS, "no-https", false, "Disable HTTPS for this route")
 	addCmd.MarkFlagRequired("port")
 }

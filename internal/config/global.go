@@ -41,6 +41,8 @@ type GlobalConfig struct {
 	HTTPPort       int          `toml:"http_port" json:"http_port"`
 	HTTPSPort      int          `toml:"https_port" json:"https_port"`
 	OnboardingDone bool         `toml:"onboarding_done" json:"onboarding_done"`
+	// Language overrides auto-detection. Values: "pt", "en", "es". Empty = auto.
+	Language string `toml:"language,omitempty" json:"language,omitempty"`
 }
 
 // DefaultGlobalConfig returns the default global configuration.
@@ -48,7 +50,7 @@ func DefaultGlobalConfig() GlobalConfig {
 	return GlobalConfig{
 		TLD:          "odin",
 		ProxyBackend: BackendCaddy,
-		DnsmasqPort:  5353,
+		DnsmasqPort:  5300,
 		CaddyAdmin:   "http://localhost:2019",
 		HTTPPort:     80,
 		HTTPSPort:    443,

@@ -1,9 +1,8 @@
 package screens
 
 import (
-	"fmt"
-
 	"github.com/adialaleal/odins/internal/config"
+	"github.com/adialaleal/odins/internal/i18n"
 	"github.com/adialaleal/odins/internal/tui/components"
 	"github.com/adialaleal/odins/internal/tui/styles"
 	tea "github.com/charmbracelet/bubbletea"
@@ -93,10 +92,10 @@ func (m SettingsModel) Update(msg tea.Msg) (SettingsModel, tea.Cmd) {
 }
 
 func (m SettingsModel) View() string {
-	titleBar := components.TitleBar(m.width, "Configurações", "")
+	titleBar := components.TitleBar(m.width, i18n.T("settings.title"), "")
 
 	// TLD selector
-	tldLabel := styles.InputLabel.Render("TLD:")
+	tldLabel := styles.InputLabel.Render(i18n.T("settings.tld_label"))
 	tldItems := make([]string, len(config.SupportedTLDs))
 	for i, t := range config.SupportedTLDs {
 		item := "." + t.TLD
@@ -124,7 +123,7 @@ func (m SettingsModel) View() string {
 	tldSection := tldBorder.Width(m.width - 8).Render(tldRow)
 
 	// Proxy backend selector
-	backendLabel := styles.InputLabel.Render("Proxy:")
+	backendLabel := styles.InputLabel.Render(i18n.T("settings.proxy_label"))
 	backendItems := make([]string, len(backends))
 	for i, b := range backends {
 		item := b
@@ -151,22 +150,20 @@ func (m SettingsModel) View() string {
 	// Warning if .local selected
 	warnLine := ""
 	if config.SupportedTLDs[m.tldIndex].Warning != "" {
-		warnLine = styles.StatusError.Render(
-			"  ⚠  .local conflita com mDNS/Bonjour no macOS — use com cuidado",
-		)
+		warnLine = styles.StatusError.Render("  " + i18n.T("settings.warn_local"))
 	}
 
 	currentTLD := "." + config.SupportedTLDs[m.tldIndex].TLD
 	currentBackend := backends[m.backendIdx]
 	info := styles.StatusInfo.Render(
-		fmt.Sprintf("  Domínios: *%s → 127.0.0.1  |  Proxy: %s", currentTLD, currentBackend),
+		"  " + i18n.Tf("settings.info", currentTLD, currentBackend),
 	)
 
 	hints := []components.KeyHint{
-		{Key: "←/→", Desc: "selecionar"},
-		{Key: "Tab", Desc: "navegar"},
-		{Key: "Enter", Desc: "salvar"},
-		{Key: "Esc", Desc: "voltar"},
+		{Key: "←/→", Desc: i18n.T("hint.select")},
+		{Key: "Tab", Desc: i18n.T("hint.navigate")},
+		{Key: "Enter", Desc: i18n.T("hint.save")},
+		{Key: "Esc", Desc: i18n.T("hint.back")},
 	}
 	footer := components.Footer(m.width, hints)
 

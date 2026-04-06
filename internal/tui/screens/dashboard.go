@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/adialaleal/odins/internal/docker"
+	"github.com/adialaleal/odins/internal/i18n"
 	"github.com/adialaleal/odins/internal/state"
 	"github.com/adialaleal/odins/internal/tui/components"
 	"github.com/adialaleal/odins/internal/tui/styles"
@@ -126,8 +127,8 @@ func (m DashboardModel) Update(msg tea.Msg) (DashboardModel, tea.Cmd) {
 // View renders the dashboard content (no footer — footer is rendered by app.go).
 func (m DashboardModel) View() string {
 	titleBar := components.TitleBar(m.width,
-		"Dashboard — Rotas Ativas",
-		fmt.Sprintf("%d rotas", len(m.routes)),
+		i18n.T("dash.title"),
+		i18n.Tf("dash.routes", len(m.routes)),
 	)
 
 	tableView := lipgloss.NewStyle().
@@ -140,7 +141,7 @@ func (m DashboardModel) View() string {
 	)
 
 	if m.confirm {
-		overlay := components.ConfirmModal(m.width, "Remover "+m.selected+"?")
+		overlay := components.ConfirmModal(m.width, i18n.Tf("dash.remove_confirm", m.selected))
 		content = lipgloss.JoinVertical(lipgloss.Left, content, "", overlay)
 	}
 

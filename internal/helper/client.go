@@ -97,50 +97,90 @@ func call(req Request) error {
 // InstallHelper installs the odins-helper via sudo.
 // This is called once during odins init.
 func InstallHelper() error {
-	// The helper binary is embedded or downloaded alongside odins
-	// For now, use sudo to write the resolver directly
 	return nil
 }
 
-// SudoWriteResolver writes /etc/resolver/<tld> via a single interactive sudo call.
-// It creates the /etc/resolver/ directory if it doesn't exist.
-func SudoWriteResolver(tld string, port int) error {
-	content := fmt.Sprintf("nameserver 127.0.0.1\nport %d\n", port)
-	tmpFile := fmt.Sprintf("/tmp/odins-resolver-%s", tld)
-
-	// Write the temp file directly (no shell needed)
-	if err := os.WriteFile(tmpFile, []byte(content), 0644); err != nil {
-		return fmt.Errorf("write temp resolver: %w", err)
+// osascriptRun executes a shell command with macOS administrator privileges
+// by showing the native system authentication dialog (like any proper Mac app).
+// Falls back to sudo on the terminal if osascript fails.
+func osascriptRun(shellCmd string) error {
+	// Escape double-quotes inside the shell command for the AppleScript string
+	escaped := ""
+	for _, c := range shellCmd {
+		if c == '"' || c == '\\' {
+			escaped += "\\"
+		}
+		escaped += string(c)
 	}
-
-	// One sudo call: mkdir -p + cp — keeps stdin connected so password prompt works
-	prompt := fmt.Sprintf("\n[ODINS] Autorização para criar /etc/resolver/%s (DNS local): ", tld)
-	shell := fmt.Sprintf("mkdir -p /etc/resolver && cp %s /etc/resolver/%s", tmpFile, tld)
-	cmd := exec.Command("sudo", "-p", prompt, "bash", "-c", shell)
-	cmd.Stdin = os.Stdin
+	script := fmt.Sprintf(`do shell script "%s" with administrator privileges`, escaped)
+	cmd := exec.Command("osascript", "-e", script)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("sudo write resolver: %w", err)
+	return cmd.Run()
+}
+
+// SudoWriteResolver writes /etc/resolver/<tld> using the macOS authentication
+// dialog (osascript). Creates the /etc/resolver/ directory if needed.
+func SudoWriteResolver(tld string, port int) error {
+	content := fmt.Sprintf("nameserver 127.0.0.1\\nport %d\\n", port)
+	resolverPath := fmt.Sprintf("/etc/resolver/%s", tld)
+	// Build a single shell command: create dir, write file via printf
+	shellCmd := fmt.Sprintf(
+		"mkdir -p /etc/resolver && printf '%s' > %s",
+		content, resolverPath,
+	)
+	if err := osascriptRun(shellCmd); err != nil {
+		// Fallback: interactive sudo on the terminal
+		prompt := fmt.Sprintf("\n[ODINS] Senha para criar /etc/resolver/%s (DNS local): ", tld)
+		fileContent := fmt.Sprintf("nameserver 127.0.0.1\nport %d\n", port)
+		tmpFile := fmt.Sprintf("/tmp/odins-resolver-%s", tld)
+		if werr := os.WriteFile(tmpFile, []byte(fileContent), 0644); werr != nil {
+			return fmt.Errorf("write temp resolver: %w", werr)
+		}
+		shell := fmt.Sprintf("mkdir -p /etc/resolver && cp %s /etc/resolver/%s", tmpFile, tld)
+		cmd2 := exec.Command("sudo", "-p", prompt, "bash", "-c", shell)
+		cmd2.Stdin = os.Stdin
+		cmd2.Stdout = os.Stdout
+		cmd2.Stderr = os.Stderr
+		if err2 := cmd2.Run(); err2 != nil {
+			return fmt.Errorf("write resolver: %w", err2)
+		}
 	}
 	return nil
 }
 
-// SudoTrustCA adds a CA cert to the system keychain via sudo.
+// SudoTrustCA adds a CA cert to the system keychain using the macOS
+// authentication dialog (osascript), falling back to sudo.
 func SudoTrustCA(certPath string) error {
-	cmd := exec.Command(
-		"sudo", "-p",
-		"\n[ODINS] Autorização para confiar no certificado HTTPS local: ",
-		"security", "add-trusted-cert",
-		"-d", "-r", "trustRoot",
-		"-k", "/Library/Keychains/System.keychain",
+	shellCmd := fmt.Sprintf(
+		"security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain %s",
 		certPath,
 	)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("sudo trust CA: %w", err)
+	if err := osascriptRun(shellCmd); err != nil {
+		// Fallback: interactive sudo on the terminal
+		cmd2 := exec.Command(
+			"sudo", "-p",
+			"\n[ODINS] Senha para confiar no certificado HTTPS local: ",
+			"security", "add-trusted-cert",
+			"-d", "-r", "trustRoot",
+			"-k", "/Library/Keychains/System.keychain",
+			certPath,
+		)
+		cmd2.Stdin = os.Stdin
+		cmd2.Stdout = os.Stdout
+		cmd2.Stderr = os.Stderr
+		if err2 := cmd2.Run(); err2 != nil {
+			return fmt.Errorf("trust CA: %w", err2)
+		}
 	}
 	return nil
+}
+
+// SudoFlushDNS flushes the macOS DNS cache and restarts mDNSResponder,
+// using the macOS authentication dialog for the privileged killall call.
+func SudoFlushDNS() {
+	// dscacheutil doesn't need root
+	exec.Command("dscacheutil", "-flushcache").Run()
+	// killall -HUP mDNSResponder needs root on macOS 10.10+
+	osascriptRun("killall -HUP mDNSResponder")
 }

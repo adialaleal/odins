@@ -238,15 +238,20 @@ func (m *Manager) Up(dir string) (UpResult, []string, error) {
 		return UpResult{}, nil, runtimeFailure(err, "não foi possível carregar o registro de rotas")
 	}
 
+	effectiveDomain := projectCfg.Project.Domain
+	if effectiveDomain == "" {
+		effectiveDomain = projectCfg.Project.Name
+	}
+
 	for _, routeCfg := range projectCfg.Routes {
-		fqdn := buildFQDN(routeCfg.Subdomain, projectCfg.Project.Domain, projectCfg.Project.Name, cfg.TLD)
+		fqdn := buildFQDN(routeCfg.Subdomain, effectiveDomain, projectCfg.Project.Name, cfg.TLD)
 		route := state.Route{
 			ID:              "odins-" + fqdn,
 			Subdomain:       fqdn,
 			Port:            routeCfg.Port,
 			Project:         projectCfg.Project.Name,
 			Runtime:         projectCfg.Project.Runtime,
-			Domain:          projectCfg.Project.Domain,
+			Domain:          effectiveDomain,
 			DockerContainer: routeCfg.DockerContainer,
 			HTTPS:           routeCfg.HTTPS,
 			CreatedAt:       time.Now(),
@@ -266,14 +271,15 @@ func (m *Manager) Up(dir string) (UpResult, []string, error) {
 		return UpResult{}, nil, runtimeFailure(err, "não foi possível persistir as rotas do projeto")
 	}
 
-	if projectCfg.Project.Domain != "" {
-		if err := regeneratePageForDomain(cfg, store, projectCfg.Project.Domain); err != nil {
+	if effectiveDomain != "" {
+		if err := regeneratePageForDomain(cfg, store, effectiveDomain); err != nil {
 			warnings = append(warnings, err.Error())
 		} else {
-			result.DomainPageURL = "https://" + projectCfg.Project.Domain + "." + cfg.TLD
+			result.DomainPageURL = "https://" + effectiveDomain + "." + cfg.TLD
 		}
 	}
 
+	projectCfg.Project.Domain = effectiveDomain
 	result.Project = projectCfg.Project
 	return result, warnings, nil
 }
@@ -308,8 +314,12 @@ func (m *Manager) Down(dir string) (DownResult, []string, error) {
 		Directory: normalizedDir,
 		Project:   projectCfg.Project.Name,
 	}
+	effectiveDomain := projectCfg.Project.Domain
+	if effectiveDomain == "" {
+		effectiveDomain = projectCfg.Project.Name
+	}
 	for _, routeCfg := range projectCfg.Routes {
-		fqdn := buildFQDN(routeCfg.Subdomain, projectCfg.Project.Domain, projectCfg.Project.Name, cfg.TLD)
+		fqdn := buildFQDN(routeCfg.Subdomain, effectiveDomain, projectCfg.Project.Name, cfg.TLD)
 		if err := m.removeProxyRoute(cfg, fqdn); err != nil {
 			warnings = append(warnings, "Falha ao remover "+fqdn+": "+err.Error())
 		}
@@ -321,11 +331,11 @@ func (m *Manager) Down(dir string) (DownResult, []string, error) {
 		return DownResult{}, nil, runtimeFailure(err, "não foi possível persistir a remoção das rotas")
 	}
 
-	if projectCfg.Project.Domain != "" {
-		if err := regeneratePageForDomain(cfg, store, projectCfg.Project.Domain); err != nil {
+	if effectiveDomain != "" {
+		if err := regeneratePageForDomain(cfg, store, effectiveDomain); err != nil {
 			warnings = append(warnings, err.Error())
 		} else {
-			result.DomainPageURL = "https://" + projectCfg.Project.Domain + "." + cfg.TLD
+			result.DomainPageURL = "https://" + effectiveDomain + "." + cfg.TLD
 		}
 	}
 
@@ -533,7 +543,7 @@ func (m *Manager) removeProxyRoute(cfg config.GlobalConfig, subdomain string) er
 func regeneratePageForDomain(cfg config.GlobalConfig, store *state.Store, domainName string) error {
 	domain, ok := store.GetDomain(domainName)
 	if !ok {
-		return configurationError(nil, "domínio '%s' não encontrado para regenerar a landing page", domainName)
+		return nil
 	}
 
 	var routes []page.RouteInfo
