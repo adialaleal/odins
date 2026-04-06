@@ -237,18 +237,53 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-// View renders the current screen with optional slide-up transition.
+// View renders the current screen. The layout is always exactly m.height lines:
+//   header + screenContent + [statusBar] + footer
+//
+// Footer lives here (not in sub-screens) so height accounting is central.
 func (m AppModel) View() string {
-	// Splash renders full-screen; skip header/status/footer wrapping.
+	// Splash is full-screen — skip the chrome wrapping entirely.
 	if m.screen == ScreenSplash {
 		return m.splash.View()
 	}
 
-	var screenView string
+	// --- Chrome elements ---
+	headerView := components.Header(m.width, "The All-Father of Local DNS")
+	footerView := components.Footer(m.width, hintsForScreen(m.screen))
 
+	statusView := ""
+	if m.status != "" {
+		prefix := "  ✦ "
+		fg := styles.ColorAccent
+		if strings.HasPrefix(m.status, "✓") || strings.HasSuffix(m.status, "!") {
+			prefix = "  ✓ "
+			fg = styles.ColorSuccess
+		}
+		statusView = lipgloss.NewStyle().
+			Background(styles.ColorSurface).
+			Foreground(fg).
+			Width(m.width).
+			Padding(0, 1).
+			Render(prefix + m.status)
+	}
+
+	// --- Compute exact content height available for the active screen ---
+	headerH := lipgloss.Height(headerView)
+	footerH := lipgloss.Height(footerView)
+	statusH := lipgloss.Height(statusView)
+	contentH := m.height - headerH - footerH - statusH
+	if contentH < 1 {
+		contentH = 1
+	}
+
+	// --- Render active screen sized to exactly contentH ---
+	var screenView string
 	switch m.screen {
 	case ScreenDashboard:
-		screenView = m.dashboard.View()
+		// Use a local copy so View() stays pure (no persistent mutation).
+		dash := m.dashboard
+		dash.SetContentHeight(contentH)
+		screenView = dash.View()
 	case ScreenAddRoute:
 		screenView = m.addRoute.View()
 	case ScreenSettings:
@@ -257,48 +292,47 @@ func (m AppModel) View() string {
 		screenView = m.logs.View()
 	}
 
-	// Apply transition offset (slide-up)
+	// Apply transition offset (slide-up) — prepend blank rows during animation.
 	if m.transActive && m.transOffset > 0 {
+		offset := m.transOffset
+		if offset > contentH {
+			offset = contentH
+		}
 		placeholder := lipgloss.NewStyle().
-			Height(m.transOffset).
+			Height(offset).
 			Width(m.width).
 			Background(styles.ColorBg).
 			Render("")
 		screenView = lipgloss.JoinVertical(lipgloss.Left, placeholder, screenView)
 	}
 
-	// Status message bar — uses accent color for info/detect messages, green for confirmations
-	if m.status != "" {
-		prefix := "  ✦ "
-		fg := styles.ColorAccent
-		// Switch to green checkmark for success-style messages
-		if strings.HasPrefix(m.status, "✓") || strings.HasSuffix(m.status, "!") {
-			prefix = "  ✓ "
-			fg = styles.ColorSuccess
-		}
-		statusBar := lipgloss.NewStyle().
-			Background(styles.ColorSurface).
-			Foreground(fg).
-			Width(m.width).
-			Padding(0, 1).
-			Render(prefix + m.status)
-		screenView = lipgloss.JoinVertical(lipgloss.Left,
-			components.Header(m.width, "The All-Father of Local DNS"),
-			screenView,
-			statusBar,
-		)
-	} else {
-		screenView = lipgloss.JoinVertical(lipgloss.Left,
-			components.Header(m.width, "The All-Father of Local DNS"),
-			screenView,
-		)
+	// --- Stack into final frame ---
+	parts := []string{headerView, screenView}
+	if statusView != "" {
+		parts = append(parts, statusView)
 	}
+	parts = append(parts, footerView)
+	return lipgloss.JoinVertical(lipgloss.Left, parts...)
+}
 
-	return lipgloss.NewStyle().
-		Width(m.width).
-		Height(m.height).
-		Background(styles.ColorBg).
-		Render(screenView)
+// hintsForScreen returns context-appropriate key hints for the footer.
+func hintsForScreen(s Screen) []components.KeyHint {
+	switch s {
+	case ScreenDashboard:
+		return []components.KeyHint{
+			{Key: "a", Desc: "adicionar"},
+			{Key: "u", Desc: "odins up"},
+			{Key: "d", Desc: "remover"},
+			{Key: "s", Desc: "settings"},
+			{Key: "l", Desc: "logs"},
+			{Key: "q", Desc: "sair"},
+		}
+	default:
+		return []components.KeyHint{
+			{Key: "esc", Desc: "voltar"},
+			{Key: "q", Desc: "sair"},
+		}
+	}
 }
 
 func (m AppModel) navigateTo(s Screen) (AppModel, tea.Cmd) {
