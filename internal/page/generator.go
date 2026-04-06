@@ -32,10 +32,10 @@ type PageData struct {
 	Routes      []RouteInfo
 	GeneratedAt string
 	// i18n strings (populated by Generate)
-	Tagline     string
-	EmptyState  string
-	GeneratedBy string
-	ServiceWord string // "service" / "serviço" / "servicio"
+	Tagline      string
+	EmptyState   string
+	GeneratedBy  string
+	ServiceWord  string // "service" / "serviço" / "servicio"
 	ServicesWord string // plural
 }
 

@@ -11,6 +11,22 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.8.0] - 2026-04-06
+
+### Added
+- `odins detect` for read-only project inspection and `.odins` recommendation
+- `odins doctor` for local environment diagnostics
+- `--json` structured output for operational commands
+- `--non-interactive`, `--tld`, and `--backend` flags for `odins init`
+- AI-friendly docs under `docs/ai/`
+- Published adapters for Codex, Claude Code, and Antigravity
+- Detection fixtures, JSON golden tests, and AI pack sync checks
+
+### Changed
+- The AI-friendly CLI flow now preserves the production runtime fixes from `v0.7.0`, including dnsmasq on port `5300`, Caddy bootstrap before service start, macOS DNS flush after resolver changes, and automatic Caddy route sync from persisted state.
+
+---
+
 ## [0.7.0] - 2026-04-06
 
 ### Added
@@ -29,7 +45,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **Caddy crash-loop on first start** — `odins init` now creates a minimal `Caddyfile` before starting the Caddy brew service
 - **Caddy route append API** — fixed invalid `POST .../routes/...` path (not supported in Caddy v2.11); corrected to `POST .../routes`
 - **dnsmasq config** — writes directly to Homebrew path instead of symlink to prevent broken-link failures on macOS
-- **`settings.go`** — removed unused `"fmt"` import after i18n migration
+- **settings.go** — removed unused `fmt` import after i18n migration
 
 ### Changed
 - All user-facing strings in CLI and TUI are now routed through `i18n.T()` / `i18n.Tf()`

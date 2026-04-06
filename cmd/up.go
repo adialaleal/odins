@@ -4,12 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/adialaleal/odins/internal/config"
-	"github.com/adialaleal/odins/internal/detect"
-	"github.com/adialaleal/odins/internal/i18n"
-	"github.com/adialaleal/odins/internal/state"
+	"github.com/adialaleal/odins/internal/service"
 	"github.com/spf13/cobra"
 )
 
@@ -39,158 +36,77 @@ func init() {
 }
 
 func runUp(cmd *cobra.Command, args []string) error {
-	dir := upDir
-	if dir == "" {
-		var err error
-		dir, err = os.Getwd()
-		if err != nil {
-			return err
-		}
-	}
-
-	cfg, err := config.LoadGlobal()
+	resolvedDir, dirWarnings, err := resolveUpDir(upDir, upGlobal)
 	if err != nil {
 		return err
 	}
 
-	// Resolve which directory to use for the .odins file:
-	// 1. --global flag → always use $HOME
-	// 2. No .odins in CWD → fall back to $HOME/.odins if it exists
-	// 3. Otherwise → use CWD (existing behaviour)
-	resolvedDir := dir
-	if upGlobal {
-		home, _ := os.UserHomeDir()
-		resolvedDir = home
-	} else if !config.ExistsProject(dir) {
-		if home, err := os.UserHomeDir(); err == nil && config.ExistsProject(home) {
-			resolvedDir = home
-			fmt.Printf("  → Usando config global em %s\n", filepath.Join(home, config.ProjectConfigFile))
-		}
+	manager := serviceFactory()
+	result, warnings, err := manager.Up(resolvedDir)
+	if err != nil {
+		return err
+	}
+	warnings = append(dirWarnings, warnings...)
+
+	if outputJSON {
+		return writeJSONSuccess(cmd.OutOrStdout(), "up", result, warnings)
 	}
 
-	projectCfgPath := filepath.Join(resolvedDir, config.ProjectConfigFile)
-
-	var projCfg config.ProjectConfig
-
-	if config.ExistsProject(resolvedDir) {
-		// Load existing .odins
-		projCfg, err = config.LoadProject(projectCfgPath)
-		if err != nil {
-			return fmt.Errorf("read .odins: %w", err)
-		}
-		fmt.Println("  " + i18n.Tf("up.reading", projCfg.Project.Name))
+	if result.GeneratedConfig {
+		writeTextLine(cmd.OutOrStdout(), "  → .odins criado em %s", result.ProjectConfigPath)
+	} else if result.AutoDetected {
+		writeTextLine(cmd.OutOrStdout(), "  → Projeto detectado automaticamente para '%s'", result.Project.Name)
 	} else {
-		// Auto-detect project in the original CWD (not home)
-		fmt.Println("  " + i18n.T("up.detecting"))
-		d := detect.Project(dir)
-
-		if d.Runtime == "unknown" {
-			return fmt.Errorf("%s", i18n.Tf("up.not_detected", dir))
-		}
-
-		fmt.Println("  " + i18n.Tf("up.detected", d.Runtime, d.Framework, d.Port))
-		fmt.Println("  " + i18n.Tf("up.start_cmd", d.StartCmd))
-
-		// Build default project config — project name IS the domain
-		projCfg = config.ProjectConfig{
-			Project: config.ProjectInfo{
-				Name:      d.Name,
-				Runtime:   d.Runtime,
-				Framework: d.Framework,
-				Domain:    d.Name,
-			},
-			Routes: []config.RouteConfig{
-				{
-					Subdomain: d.Name,
-					Port:      d.Port,
-					HTTPS:     true,
-				},
-			},
-		}
-
-		// Save the generated .odins to original CWD
-		savePath := filepath.Join(dir, config.ProjectConfigFile)
-		if err := config.SaveProject(savePath, projCfg); err != nil {
-			fmt.Println("  " + i18n.Tf("up.save_warn", err))
-		} else {
-			fmt.Println("  " + i18n.Tf("up.created", savePath))
-		}
+		writeTextLine(cmd.OutOrStdout(), "  → Lendo .odins do projeto '%s'", result.Project.Name)
 	}
-
-	// Apply routes
-	store, err := state.Load()
-	if err != nil {
-		return err
+	for _, route := range result.Routes {
+		writeTextLine(cmd.OutOrStdout(), "  ✓ %s://%s → :%d", route.Proto, route.Route.Subdomain, route.Route.Port)
 	}
-
-	domain := projCfg.Project.Domain
-	// If no explicit domain, use project name (project.odins style)
-	if domain == "" {
-		domain = projCfg.Project.Name
+	if result.DomainPageURL != "" {
+		writeTextLine(cmd.OutOrStdout(), "  → Landing page atualizada: %s", result.DomainPageURL)
 	}
-
-	if domain != "" {
-		fmt.Println("  " + i18n.Tf("up.domain", domain, cfg.TLD))
+	for _, warning := range warnings {
+		writeTextLine(cmd.OutOrStdout(), "  ⚠  %s", warning)
 	}
-
-	applied := 0
-	for _, rc := range projCfg.Routes {
-		fqdn := buildFQDN(rc.Subdomain, domain, projCfg.Project.Name, cfg.TLD)
-
-		r := state.Route{
-			ID:              "odins-" + fqdn,
-			Subdomain:       fqdn,
-			Port:            rc.Port,
-			Project:         projCfg.Project.Name,
-			Runtime:         projCfg.Project.Runtime,
-			Domain:          domain,
-			DockerContainer: rc.DockerContainer,
-			HTTPS:           rc.HTTPS,
-			CreatedAt:       time.Now(),
-		}
-
-		if err := proxyAdd(cfg, r); err != nil {
-			fmt.Println("  " + i18n.Tf("up.route_error", fqdn, err))
-			continue
-		}
-
-		store.Add(r)
-
-		proto := "https"
-		if !r.HTTPS {
-			proto = "http"
-		}
-		fmt.Println("  " + i18n.Tf("up.route_ok", proto, fqdn, rc.Port))
-		applied++
-	}
-
-	if err := store.Save(); err != nil {
-		return err
-	}
-
-	// Regenerate landing page if attached to a domain
-	if domain != "" {
-		regeneratePageForDomain(cfg, store, domain)
-		fmt.Println("  " + i18n.Tf("up.page_updated", domain, cfg.TLD))
-	}
-
-	fmt.Println()
-	fmt.Println("  " + i18n.Tf("up.applied", applied, projCfg.Project.Name))
+	writeTextLine(cmd.OutOrStdout(), "")
+	writeTextLine(cmd.OutOrStdout(), "  %d rota(s) ativada(s) para '%s'", len(result.Routes), result.Project.Name)
 	return nil
 }
 
-// buildFQDN constructs the full FQDN for a route.
-//   - domain set:          subdomain.domain.tld   (e.g. web.project.odins)
-//   - subdomain has dot:   subdomain.tld           (e.g. api.rankly.odins)
-//   - otherwise:           subdomain.project.tld
-func buildFQDN(subdomain, domain, project, tld string) string {
-	if domain != "" {
-		return subdomain + "." + domain + "." + tld
-	}
-	for _, c := range subdomain {
-		if c == '.' {
-			return subdomain + "." + tld
+func resolveUpDir(dir string, useGlobal bool) (string, []string, error) {
+	if useGlobal {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", nil, service.InvalidInput("não foi possível resolver o diretório HOME para `odins up --global`")
 		}
+		return home, nil, nil
 	}
-	return subdomain + "." + project + "." + tld
+
+	baseDir := dir
+	if baseDir == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", nil, service.InvalidInput("não foi possível resolver o diretório atual")
+		}
+		baseDir = cwd
+	}
+
+	resolvedDir, err := filepath.Abs(baseDir)
+	if err != nil {
+		return "", nil, service.InvalidInput(fmt.Sprintf("não foi possível resolver o diretório %q", baseDir))
+	}
+
+	if config.ExistsProject(resolvedDir) {
+		return resolvedDir, nil, nil
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return resolvedDir, nil, nil
+	}
+	if config.ExistsProject(home) {
+		return home, []string{"Usando config global em " + filepath.Join(home, config.ProjectConfigFile)}, nil
+	}
+
+	return resolvedDir, nil, nil
 }

@@ -31,9 +31,9 @@ ODINS is a **local DNS + reverse proxy manager** for macOS developers.
 Instead of juggling `localhost:3000`, `localhost:5173`, `localhost:8080`... you get:
 
 ```
-https://api.rankly.odins   →  localhost:3000   (Node.js / Express)
-https://app.rankly.odins   →  localhost:5173   (Vite / React)
-https://jobs.rankly.odins  →  localhost:8080   (Go / Gin)
+https://api.rankly.odin   →  localhost:3000   (Node.js / Express)
+https://app.rankly.odin   →  localhost:5173   (Vite / React)
+https://jobs.rankly.odin  →  localhost:8080   (Go / Gin)
 ```
 
 Zero config. One command. Automatic HTTPS. Beautiful TUI dashboard.
@@ -55,24 +55,44 @@ curl -fsSL https://raw.githubusercontent.com/adialaleal/odins/main/install.sh | 
 
 ---
 
+## AI Friendly
+
+ODINS agora expõe uma superfície oficial para agentes via `CLI + JSON + docs`.
+
+- Use `odins detect --json` para inspecionar um projeto sem alterar arquivos.
+- Use `odins doctor --json` para diagnosticar DNS, proxy, HTTPS e store.
+- Use `--json` nos comandos operacionais para saídas estáveis em automação.
+- Consulte [AGENTS.md](AGENTS.md), [CLAUDE.md](CLAUDE.md) e [`ai/`](ai/) para os adapters publicados.
+
+Documentação canônica:
+
+- [docs/ai/setup-local.md](docs/ai/setup-local.md)
+- [docs/ai/apply-to-project.md](docs/ai/apply-to-project.md)
+- [docs/ai/workspace-multi-service.md](docs/ai/workspace-multi-service.md)
+- [docs/ai/doctor-troubleshoot.md](docs/ai/doctor-troubleshoot.md)
+
+---
+
 ## Quick Start
 
 ```bash
 # 1. One-time setup — installs dnsmasq + Caddy, configures DNS and HTTPS
 odins init
 
-# 2. Go to any project directory
+# 2. Inspect any project first
 cd ~/Projects/my-api
+odins detect --json
 
-# 3. Apply routes — auto-detects Node.js / Go / Python
+# 3. Apply routes in the project directory
 odins up
-#  → Detectado: node/nextjs (porta 3000)
-#  → ✓ https://my-api.my-api.odins → :3000
+#  → Detectado: node/vite (porta 5173)
+#  → ✓ https://my-api.my-api.odin → :5173
 
-# 4. Open in browser
-open https://my-api.odins
+# 4. Validate routes and the local environment
+odins ls
+odins doctor
 
-# 5. Or manage everything from the TUI
+# 5. Open the TUI dashboard
 odins
 ```
 
@@ -85,10 +105,10 @@ odins
 │                                                                               │
 │  STATUS  SUBDOMAIN              PORT   PROTO  RUNTIME   PROJECT              │
 │  ──────  ─────────              ────   ─────  ───────   ───────              │
-│  ●       app.rankly.odins       3000   HTTPS  node      rankly               │
-│  ●       api.rankly.odins       4000   HTTPS  node      rankly               │
-│  ●       jobs.rankly.odins      8080   HTTPS  go        rankly               │
-│  ○       worker.rankly.odins    5000   HTTPS  docker    rankly               │
+│  ●       app.rankly.odin        3000   HTTPS  node      rankly               │
+│  ●       api.rankly.odin        4000   HTTPS  node      rankly               │
+│  ●       jobs.rankly.odin       8080   HTTPS  go        rankly               │
+│  ○       worker.rankly.odin     5000   HTTPS  docker    rankly               │
 │                                                                               │
 │  [a] adicionar  [u] odins up  [x] remover  [s] settings  [l] logs  [q] sair │
 └───────────────────────────────────────────────────────────────────────────────┘
@@ -102,12 +122,27 @@ odins
 |---|---|
 | `odins` | Open TUI dashboard |
 | `odins init` | One-time setup: DNS, proxy, HTTPS |
+| `odins detect` | Inspect project runtime/framework/port and recommend a `.odins` |
 | `odins up` | Apply routes from `.odins` in current directory |
 | `odins down` | Remove all routes for current project |
-| `odins domain add <name>` | Create a domain workspace (landing page) |
 | `odins add <sub> --port <n>` | Add a single route |
 | `odins kill <subdomain>` | Remove a specific route |
 | `odins ls` | List all active routes |
+| `odins doctor` | Diagnose Homebrew, DNS, proxy, HTTPS and store health |
+| `odins domain add <name>` | Create a workspace domain landing page |
+| `odins domain ls` | List workspace domains |
+| `odins domain rm <name>` | Remove a workspace domain |
+
+### Machine-readable mode
+
+All operational commands support `--json`.
+
+```bash
+odins detect --json
+odins ls --json
+odins doctor --json
+odins init --json --non-interactive --tld odin --backend caddy
+```
 
 ### Flags
 
@@ -139,12 +174,12 @@ framework = "nextjs"     # auto-detected
 domain    = "rankly"     # → routes become sub.rankly.<tld>
 
 [[routes]]
-subdomain = "app"        # → app.rankly.odins
+subdomain = "app"        # → app.rankly.odin
 port      = 3000
 https     = true
 
 [[routes]]
-subdomain = "api"        # → api.rankly.odins
+subdomain = "api"        # → api.rankly.odin
 port      = 4000
 https     = true
 
@@ -153,6 +188,36 @@ subdomain = "worker"     # Docker container
 port      = 5000
 docker_container = "rankly_worker_1"
 https     = true
+```
+
+---
+
+## Prompt Recipes
+
+Copy and paste one of these prompts into your AI coding tool:
+
+### Detect a project
+
+```text
+Explore este repositório primeiro. Depois rode `odins detect --json` na raiz do projeto, resuma runtime/framework/porta detectados e proponha o `.odins` recomendado sem aplicar mudanças ainda.
+```
+
+### Propose and apply `.odins`
+
+```text
+Explore este projeto, rode `odins detect --json`, proponha o `.odins` ideal e só depois aplique com `odins up`. Se houver qualquer ação com sudo, me avise antes.
+```
+
+### Connect to a workspace domain
+
+```text
+Explore o projeto, sugira como conectá-lo a um workspace ODINS existente ou novo usando `odins domain add` e o campo `domain` no `.odins`. Prefira `odins detect --json` antes de qualquer mudança.
+```
+
+### Validate the environment
+
+```text
+Rode `odins doctor --json`, explique cada check com problema e proponha a próxima ação mínima para deixar o ambiente saudável.
 ```
 
 ---
@@ -187,8 +252,8 @@ Choose during `odins init`:
 
 | TLD | Notes |
 |---|---|
-| `.odins` | Thematic, no conflicts — **default** |
-| `.odin` | Shorter variant |
+| `.odin` | Thematic, no conflicts — **default** |
+| `.odins` | Thematic variant |
 | `.test` | IANA reserved for testing |
 | `.dev` | Popular · HTTPS required (Caddy handles it) |
 | `.lan` | Common in local networks |
@@ -218,11 +283,11 @@ language = "en"   # "pt" | "en" | "es"
 ## Architecture
 
 ```
-Browser → *.rankly.odins
+Browser → *.rankly.odin
                ↓
-         dnsmasq :5300   (wildcard *.odins → 127.0.0.1)
+         dnsmasq :5300   (wildcard *.odin → 127.0.0.1)
                ↓
-         /etc/resolver/odins  (macOS resolver)
+         /etc/resolver/odin  (macOS resolver)
                ↓
          Caddy :443 / :80  (reverse proxy + HTTPS)
                ↓
@@ -241,12 +306,14 @@ Browser → *.rankly.odins
 
 **DNS not resolving?**
 ```bash
+odins doctor
 brew services restart dnsmasq
-scutil --dns | grep odins   # should show nameserver 127.0.0.1, port 5300
+scutil --dns | grep odin   # should show nameserver 127.0.0.1, port 5300
 ```
 
 **Caddy not starting?**
 ```bash
+odins doctor --json
 brew services restart caddy
 curl http://localhost:2019/config/
 ```

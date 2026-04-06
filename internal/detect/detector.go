@@ -7,13 +7,13 @@ import (
 
 // DetectedProject contains auto-detected project information.
 type DetectedProject struct {
-	Name        string
-	Runtime     string // "node", "go", "python", "unknown"
-	Framework   string // "nextjs", "gin", "fastapi", etc.
-	Port        int
-	StartCmd    string
-	HasDocker   bool
-	HasCompose  bool
+	Name       string `json:"name"`
+	Runtime    string `json:"runtime"`   // "node", "go", "python", "unknown"
+	Framework  string `json:"framework"` // "nextjs", "gin", "fastapi", etc.
+	Port       int    `json:"port"`
+	StartCmd   string `json:"start_cmd"`
+	HasDocker  bool   `json:"has_docker"`
+	HasCompose bool   `json:"has_compose"`
 }
 
 // Project detects the project type and configuration in dir.

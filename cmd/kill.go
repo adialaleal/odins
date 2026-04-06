@@ -1,13 +1,6 @@
 package cmd
 
-import (
-	"fmt"
-
-	"github.com/adialaleal/odins/internal/config"
-	"github.com/adialaleal/odins/internal/i18n"
-	"github.com/adialaleal/odins/internal/state"
-	"github.com/spf13/cobra"
-)
+import "github.com/spf13/cobra"
 
 var killCmd = &cobra.Command{
 	Use:   "kill <subdomain>",
@@ -17,44 +10,27 @@ var killCmd = &cobra.Command{
 Examples:
   odins kill api.rankly.odin
   odins kill app.rankly.odin`,
-	Args: cobra.ExactArgs(1),
+	Args: exactArgs(1),
 	RunE: runKill,
 }
 
 func runKill(cmd *cobra.Command, args []string) error {
-	subdomain := args[0]
-
-	cfg, err := config.LoadGlobal()
+	manager := serviceFactory()
+	result, warnings, err := manager.Kill(args[0])
 	if err != nil {
 		return err
 	}
 
-	store, err := state.Load()
-	if err != nil {
-		return err
+	if outputJSON {
+		return writeJSONSuccess(cmd.OutOrStdout(), "kill", result, warnings)
 	}
 
-	route, ok := store.Get(subdomain)
-	if !ok {
-		return fmt.Errorf("%s", i18n.Tf("kill.not_found", subdomain))
+	writeTextLine(cmd.OutOrStdout(), "  ✓ %s removido", result.Subdomain)
+	if result.DomainPageURL != "" {
+		writeTextLine(cmd.OutOrStdout(), "  → Landing page atualizada: %s", result.DomainPageURL)
 	}
-
-	domainName := route.Domain
-
-	if err := proxyRemove(cfg, subdomain); err != nil {
-		fmt.Println("  " + i18n.Tf("kill.proxy_warn", err))
+	for _, warning := range warnings {
+		writeTextLine(cmd.OutOrStdout(), "  ⚠  %s", warning)
 	}
-
-	store.Remove(subdomain)
-	if err := store.Save(); err != nil {
-		return err
-	}
-
-	// Regenerate landing page if the route belonged to a domain
-	if domainName != "" {
-		regeneratePageForDomain(cfg, store, domainName)
-	}
-
-	fmt.Println("  " + i18n.Tf("kill.removed", subdomain))
 	return nil
 }
