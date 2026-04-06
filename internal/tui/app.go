@@ -4,6 +4,7 @@ package tui
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/adialaleal/odins/internal/config"
 	"github.com/adialaleal/odins/internal/detect"
@@ -67,10 +68,27 @@ func Run() error {
 
 	logPath := resolveLogPath(cfg)
 
+	// Auto-detect project if .odins is absent in the current directory.
+	// Set a welcome status message that prompts the user to press [u].
+	cwd, _ := os.Getwd()
+	autoStatus := ""
+	if !config.ExistsProject(cwd) {
+		d := detect.Project(cwd)
+		if d.Runtime != "unknown" {
+			autoStatus = fmt.Sprintf(
+				"Projeto '%s' (%s/%s, porta %d) detectado — pressione [u] para ativar as rotas",
+				d.Name, d.Runtime, d.Framework, d.Port,
+			)
+		} else {
+			autoStatus = "Nenhum .odins encontrado — pressione [a] para adicionar uma rota manualmente"
+		}
+	}
+
 	m := AppModel{
 		screen: ScreenDashboard,
 		cfg:    cfg,
 		store:  store,
+		status: autoStatus,
 	}
 
 	// Initialize sub-models with placeholder size (updated on WindowSizeMsg)
@@ -206,14 +224,21 @@ func (m AppModel) View() string {
 		screenView = lipgloss.JoinVertical(lipgloss.Left, placeholder, screenView)
 	}
 
-	// Status message bar
+	// Status message bar — uses accent color for info/detect messages, green for confirmations
 	if m.status != "" {
+		prefix := "  ✦ "
+		fg := styles.ColorAccent
+		// Switch to green checkmark for success-style messages
+		if strings.HasPrefix(m.status, "✓") || strings.HasSuffix(m.status, "!") {
+			prefix = "  ✓ "
+			fg = styles.ColorSuccess
+		}
 		statusBar := lipgloss.NewStyle().
 			Background(styles.ColorSurface).
-			Foreground(styles.ColorSuccess).
+			Foreground(fg).
 			Width(m.width).
 			Padding(0, 1).
-			Render("  ✓ " + m.status)
+			Render(prefix + m.status)
 		screenView = lipgloss.JoinVertical(lipgloss.Left,
 			components.Header(m.width, "The All-Father of Local DNS"),
 			screenView,

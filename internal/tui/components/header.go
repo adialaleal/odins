@@ -1,37 +1,68 @@
 package components
 
 import (
+	"strings"
+
 	"github.com/adialaleal/odins/internal/tui/styles"
 	"github.com/charmbracelet/lipgloss"
 )
 
-const logo = `  ____  ____  ___ _   _ ____
- / __ \|  _ \|_ _| \ | / ___|
-| |  | | | | || ||  \| \___ \
-| |__| | |_| || || |\  |___) |
- \____/|____/|___|_| \_|____/ `
+// logoLines are rendered with an individual gradient color per line.
+var logoLines = []string{
+	`   ██████╗ ██████╗ ██╗███╗   ██╗███████╗`,
+	`  ██╔═══██╗██╔══██╗██║████╗  ██║██╔════╝`,
+	`  ██║   ██║██║  ██║██║██╔██╗ ██║███████╗`,
+	`  ██║   ██║██║  ██║██║██║╚██╗██║╚════██║`,
+	`  ╚██████╔╝██████╔╝██║██║ ╚████║███████║`,
+	`   ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝╚══════╝`,
+}
 
-// Header renders the ODINS app header with logo and subtitle.
+// Gradient: light violet at top → deep violet at bottom
+var logoGradient = []lipgloss.Color{
+	"#E9D5FF", // violet-200
+	"#C4B5FD", // violet-300
+	"#A78BFA", // violet-400
+	"#8B5CF6", // violet-500
+	"#7C3AED", // violet-600
+	"#6D28D9", // violet-700
+}
+
+// Header renders the ODINS app header with gradient logo and subtitle.
 func Header(width int, subtitle string) string {
-	logoStyle := lipgloss.NewStyle().
-		Foreground(styles.ColorPrimary).
-		Bold(true)
+	// Top margin — keeps logo from sticking to terminal edge
+	topMargin := "\n"
+
+	var logoRendered []string
+	for i, line := range logoLines {
+		color := logoGradient[i]
+		rendered := lipgloss.NewStyle().
+			Foreground(color).
+			Bold(true).
+			Render(line)
+		logoRendered = append(logoRendered, rendered)
+	}
+
+	decorLine := lipgloss.NewStyle().
+		Foreground(styles.ColorBorder).
+		Render("  ᚦ ᚢ ᚱ ᛋ ᛏ ᚨ ᛉ ᚾ")
 
 	subtitleStyle := lipgloss.NewStyle().
-		Foreground(styles.ColorMuted).
+		Foreground(styles.ColorAccent).
 		Italic(true)
 
 	content := lipgloss.JoinVertical(
 		lipgloss.Left,
-		logoStyle.Render(logo),
-		subtitleStyle.Render("  "+subtitle),
+		topMargin,
+		strings.Join(logoRendered, "\n"),
+		decorLine,
+		subtitleStyle.Render("    "+subtitle),
 		"",
 	)
 
 	return lipgloss.NewStyle().
 		Width(width).
 		Align(lipgloss.Left).
-		Padding(0, 2).
+		Padding(0, 1).
 		Render(content)
 }
 

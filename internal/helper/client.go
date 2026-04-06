@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"time"
 )
@@ -101,44 +102,45 @@ func InstallHelper() error {
 	return nil
 }
 
-// SudoWriteResolver is a fallback that writes /etc/resolver/<tld> via sudo.
+// SudoWriteResolver writes /etc/resolver/<tld> via a single interactive sudo call.
+// It creates the /etc/resolver/ directory if it doesn't exist.
 func SudoWriteResolver(tld string, port int) error {
 	content := fmt.Sprintf("nameserver 127.0.0.1\nport %d\n", port)
 	tmpFile := fmt.Sprintf("/tmp/odins-resolver-%s", tld)
 
-	if err := writeTemp(tmpFile, content); err != nil {
-		return err
+	// Write the temp file directly (no shell needed)
+	if err := os.WriteFile(tmpFile, []byte(content), 0644); err != nil {
+		return fmt.Errorf("write temp resolver: %w", err)
 	}
 
-	out, err := exec.Command(
-		"sudo", "-p",
-		fmt.Sprintf("[ODINS] Autorização para criar /etc/resolver/%s (DNS local): ", tld),
-		"cp", tmpFile,
-		fmt.Sprintf("/etc/resolver/%s", tld),
-	).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("sudo write resolver: %w\n%s", err, string(out))
+	// One sudo call: mkdir -p + cp — keeps stdin connected so password prompt works
+	prompt := fmt.Sprintf("\n[ODINS] Autorização para criar /etc/resolver/%s (DNS local): ", tld)
+	shell := fmt.Sprintf("mkdir -p /etc/resolver && cp %s /etc/resolver/%s", tmpFile, tld)
+	cmd := exec.Command("sudo", "-p", prompt, "bash", "-c", shell)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("sudo write resolver: %w", err)
 	}
-
 	return nil
 }
 
 // SudoTrustCA adds a CA cert to the system keychain via sudo.
 func SudoTrustCA(certPath string) error {
-	out, err := exec.Command(
+	cmd := exec.Command(
 		"sudo", "-p",
-		"[ODINS] Autorização para confiar no certificado HTTPS local: ",
+		"\n[ODINS] Autorização para confiar no certificado HTTPS local: ",
 		"security", "add-trusted-cert",
 		"-d", "-r", "trustRoot",
 		"-k", "/Library/Keychains/System.keychain",
 		certPath,
-	).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("sudo trust CA: %w\n%s", err, string(out))
+	)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("sudo trust CA: %w", err)
 	}
 	return nil
-}
-
-func writeTemp(path, content string) error {
-	return exec.Command("bash", "-c", fmt.Sprintf("echo %q > %s", content, path)).Run()
 }

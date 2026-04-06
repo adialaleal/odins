@@ -177,7 +177,12 @@ func (m DashboardModel) buildRows() []table.Row {
 		if r.HTTPS {
 			proto = "HTTPS"
 		}
-		status := components.StatusDot(m.statuses[r.Subdomain])
+		// Use plain ASCII so bubbles/table measures widths correctly.
+		// ANSI-colored strings in cells break column alignment.
+		status := "○"
+		if m.statuses[r.Subdomain] {
+			status = "●"
+		}
 		runtime := r.Runtime
 		if r.DockerContainer != "" {
 			runtime = "docker"
@@ -187,12 +192,15 @@ func (m DashboardModel) buildRows() []table.Row {
 			r.Subdomain,
 			fmt.Sprintf("%d", r.Port),
 			proto,
-			styles.RuntimeBadge(runtime),
+			runtime,
 			r.Project,
 		})
 	}
 	return rows
 }
+
+// statusDotForRow is kept for future use with a custom renderer.
+var _ = components.StatusDot
 
 // DeleteRouteMsg signals that a route should be deleted.
 type DeleteRouteMsg struct{ Subdomain string }
