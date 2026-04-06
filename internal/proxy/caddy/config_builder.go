@@ -27,6 +27,34 @@ func buildBaseConfig(tld string) map[string]interface{} {
 	}
 }
 
+// buildDomainRoute returns a Caddy route that serves a static file_server for a domain landing page.
+func buildDomainRoute(hostname, pageDir string) map[string]interface{} {
+	return map[string]interface{}{
+		"@id": "odins-domain-" + hostname,
+		"match": []interface{}{
+			map[string]interface{}{
+				"host": []string{hostname},
+			},
+		},
+		"handle": []interface{}{
+			map[string]interface{}{
+				"handler": "subroute",
+				"routes": []interface{}{
+					map[string]interface{}{
+						"handle": []interface{}{
+							map[string]interface{}{
+								"handler": "file_server",
+								"root":    pageDir,
+							},
+						},
+					},
+				},
+			},
+		},
+		"terminal": true,
+	}
+}
+
 // buildRoute returns a Caddy route JSON object for a single subdomain.
 func buildRoute(subdomain, upstream, id string) map[string]interface{} {
 	return map[string]interface{}{

@@ -16,14 +16,24 @@ type Route struct {
 	Port            int       `json:"port"`
 	Project         string    `json:"project"`
 	Runtime         string    `json:"runtime"`
+	Domain          string    `json:"domain,omitempty"` // parent domain (e.g. "tatoh")
 	DockerContainer string    `json:"docker_container"`
 	HTTPS           bool      `json:"https"`
 	CreatedAt       time.Time `json:"created_at"`
 }
 
-// Store is the persistent route registry.
+// Domain represents a local domain workspace (e.g. "tatoh" → tatoh.odins).
+type Domain struct {
+	Name        string    `json:"name"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// Store is the persistent route and domain registry.
 type Store struct {
-	Routes []Route `json:"routes"`
+	Routes  []Route  `json:"routes"`
+	Domains []Domain `json:"domains"`
 }
 
 func dataDir() string {
@@ -111,4 +121,58 @@ func (s *Store) ByProject(project string) []Route {
 		}
 	}
 	return out
+}
+
+// ByDomain returns all routes attached to a domain name.
+func (s *Store) ByDomain(domain string) []Route {
+	var out []Route
+	for _, r := range s.Routes {
+		if r.Domain == domain {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// AddDomain adds or updates a domain in the store.
+func (s *Store) AddDomain(d Domain) {
+	if d.CreatedAt.IsZero() {
+		d.CreatedAt = time.Now()
+	}
+	for i, existing := range s.Domains {
+		if existing.Name == d.Name {
+			s.Domains[i] = d
+			return
+		}
+	}
+	s.Domains = append(s.Domains, d)
+}
+
+// GetDomain returns a domain by name.
+func (s *Store) GetDomain(name string) (Domain, bool) {
+	for _, d := range s.Domains {
+		if d.Name == name {
+			return d, true
+		}
+	}
+	return Domain{}, false
+}
+
+// RemoveDomain deletes a domain and all its routes.
+func (s *Store) RemoveDomain(name string) bool {
+	for i, d := range s.Domains {
+		if d.Name == name {
+			s.Domains = append(s.Domains[:i], s.Domains[i+1:]...)
+			// Also remove all routes that belong to this domain
+			var kept []Route
+			for _, r := range s.Routes {
+				if r.Domain != name {
+					kept = append(kept, r)
+				}
+			}
+			s.Routes = kept
+			return true
+		}
+	}
+	return false
 }

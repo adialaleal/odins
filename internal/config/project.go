@@ -10,23 +10,24 @@ const ProjectConfigFile = ".odins"
 
 // RouteConfig represents a single route in a project .odins file.
 type RouteConfig struct {
-	Subdomain       string `toml:"subdomain"`
-	Port            int    `toml:"port"`
-	HTTPS           bool   `toml:"https"`
-	DockerContainer string `toml:"docker_container,omitempty"`
+	Subdomain       string `toml:"subdomain" json:"subdomain"`
+	Port            int    `toml:"port" json:"port"`
+	HTTPS           bool   `toml:"https" json:"https"`
+	DockerContainer string `toml:"docker_container,omitempty" json:"docker_container,omitempty"`
 }
 
 // ProjectInfo holds metadata about the project.
 type ProjectInfo struct {
-	Name      string `toml:"name"`
-	Runtime   string `toml:"runtime,omitempty"`
-	Framework string `toml:"framework,omitempty"`
+	Name      string `toml:"name" json:"name"`
+	Runtime   string `toml:"runtime,omitempty" json:"runtime,omitempty"`
+	Framework string `toml:"framework,omitempty" json:"framework,omitempty"`
+	Domain    string `toml:"domain,omitempty" json:"domain,omitempty"` // parent domain (e.g. "tatoh")
 }
 
 // ProjectConfig is the structure of a .odins file.
 type ProjectConfig struct {
-	Project ProjectInfo   `toml:"project"`
-	Routes  []RouteConfig `toml:"routes"`
+	Project ProjectInfo   `toml:"project" json:"project"`
+	Routes  []RouteConfig `toml:"routes" json:"routes"`
 }
 
 // LoadProject reads a .odins file from the given path.

@@ -34,12 +34,13 @@ const (
 
 // GlobalConfig holds ODINS global settings stored at ~/.config/odins/config.toml.
 type GlobalConfig struct {
-	TLD          string       `toml:"tld"`
-	ProxyBackend ProxyBackend `toml:"proxy_backend"`
-	DnsmasqPort  int          `toml:"dnsmasq_port"`
-	CaddyAdmin   string       `toml:"caddy_admin"`
-	HTTPPort     int          `toml:"http_port"`
-	HTTPSPort    int          `toml:"https_port"`
+	TLD            string       `toml:"tld" json:"tld"`
+	ProxyBackend   ProxyBackend `toml:"proxy_backend" json:"proxy_backend"`
+	DnsmasqPort    int          `toml:"dnsmasq_port" json:"dnsmasq_port"`
+	CaddyAdmin     string       `toml:"caddy_admin" json:"caddy_admin"`
+	HTTPPort       int          `toml:"http_port" json:"http_port"`
+	HTTPSPort      int          `toml:"https_port" json:"https_port"`
+	OnboardingDone bool         `toml:"onboarding_done" json:"onboarding_done"`
 }
 
 // DefaultGlobalConfig returns the default global configuration.

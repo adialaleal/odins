@@ -4,13 +4,15 @@ package tui
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/adialaleal/odins/internal/config"
 	"github.com/adialaleal/odins/internal/detect"
+	"github.com/adialaleal/odins/internal/proxy/apache"
 	"github.com/adialaleal/odins/internal/proxy/caddy"
 	"github.com/adialaleal/odins/internal/proxy/nginx"
-	"github.com/adialaleal/odins/internal/proxy/apache"
 	"github.com/adialaleal/odins/internal/state"
 	"github.com/adialaleal/odins/internal/tui/components"
 	"github.com/adialaleal/odins/internal/tui/screens"
@@ -23,7 +25,8 @@ import (
 type Screen int
 
 const (
-	ScreenDashboard Screen = iota
+	ScreenSplash Screen = iota
+	ScreenDashboard
 	ScreenAddRoute
 	ScreenSettings
 	ScreenLogs
@@ -40,6 +43,7 @@ type AppModel struct {
 	transActive bool
 
 	// sub-models
+	splash    screens.SplashModel
 	dashboard screens.DashboardModel
 	addRoute  screens.AddRouteModel
 	settings  screens.SettingsModel
@@ -85,13 +89,14 @@ func Run() error {
 	}
 
 	m := AppModel{
-		screen: ScreenDashboard,
+		screen: ScreenSplash,
 		cfg:    cfg,
 		store:  store,
 		status: autoStatus,
 	}
 
 	// Initialize sub-models with placeholder size (updated on WindowSizeMsg)
+	m.splash = screens.NewSplash(80, 24)
 	m.dashboard = screens.NewDashboard(store.Routes, 80, 24)
 	m.settings = screens.NewSettings(cfg, 80, 24)
 	m.logs = screens.NewLogs(logPath, 80, 24)
@@ -104,6 +109,7 @@ func Run() error {
 // Init starts all sub-model inits.
 func (m AppModel) Init() tea.Cmd {
 	return tea.Batch(
+		m.splash.Init(),
 		m.dashboard.Init(),
 		m.logs.Init(),
 	)
@@ -117,16 +123,33 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		var splashCmd tea.Cmd
+		m.splash, splashCmd = m.splash.Update(msg)
+		cmds = append(cmds, splashCmd)
 		m.dashboard.SetSize(m.width, m.height)
 		m.logs.SetSize(m.width, m.height)
+		return m, tea.Batch(cmds...)
+
+	case screens.SplashDoneMsg:
+		m.screen = ScreenDashboard
 		return m, nil
 
 	case tea.KeyMsg:
+		// Dismiss splash immediately on any key press
+		if m.screen == ScreenSplash {
+			m.screen = ScreenDashboard
+			return m, nil
+		}
 		// Global key handlers
 		switch msg.String() {
 		case "ctrl+c", "q":
 			if m.screen == ScreenDashboard {
 				return m, tea.Quit
+			}
+		case "u":
+			if m.screen == ScreenDashboard {
+				m.status = "Ativando rotas..."
+				return m, odinsUpCmd(m.cfg, m.store)
 			}
 		case "a":
 			if m.screen == ScreenDashboard {
@@ -166,6 +189,17 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case screens.AddRouteCancelMsg:
 		return m.navigateTo(ScreenDashboard)
 
+	case UpDoneMsg:
+		if msg.Err != nil {
+			m.status = "Erro: " + msg.Err.Error()
+		} else if msg.Applied == 0 {
+			m.status = "Nenhuma rota aplicada"
+		} else {
+			m.status = fmt.Sprintf("✓ %d rota(s) ativada(s)!", msg.Applied)
+		}
+		m.dashboard.SetRoutes(m.store.Routes)
+		return m, nil
+
 	case screens.SettingsSavedMsg:
 		m.cfg = msg.Config
 		if err := config.SaveGlobal(m.cfg); err != nil {
@@ -178,6 +212,10 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Delegate to active screen
 	switch m.screen {
+	case ScreenSplash:
+		var cmd tea.Cmd
+		m.splash, cmd = m.splash.Update(msg)
+		cmds = append(cmds, cmd)
 	case ScreenDashboard:
 		var cmd tea.Cmd
 		m.dashboard, cmd = m.dashboard.Update(msg)
@@ -199,13 +237,53 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-// View renders the current screen with optional slide-up transition.
+// View renders the current screen. The layout is always exactly m.height lines:
+//   header + screenContent + [statusBar] + footer
+//
+// Footer lives here (not in sub-screens) so height accounting is central.
 func (m AppModel) View() string {
-	var screenView string
+	// Splash is full-screen — skip the chrome wrapping entirely.
+	if m.screen == ScreenSplash {
+		return m.splash.View()
+	}
 
+	// --- Chrome elements ---
+	headerView := components.Header(m.width, "The All-Father of Local DNS")
+	footerView := components.Footer(m.width, hintsForScreen(m.screen))
+
+	statusView := ""
+	if m.status != "" {
+		prefix := "  ✦ "
+		fg := styles.ColorAccent
+		if strings.HasPrefix(m.status, "✓") || strings.HasSuffix(m.status, "!") {
+			prefix = "  ✓ "
+			fg = styles.ColorSuccess
+		}
+		statusView = lipgloss.NewStyle().
+			Background(styles.ColorSurface).
+			Foreground(fg).
+			Width(m.width).
+			Padding(0, 1).
+			Render(prefix + m.status)
+	}
+
+	// --- Compute exact content height available for the active screen ---
+	headerH := lipgloss.Height(headerView)
+	footerH := lipgloss.Height(footerView)
+	statusH := lipgloss.Height(statusView)
+	contentH := m.height - headerH - footerH - statusH
+	if contentH < 1 {
+		contentH = 1
+	}
+
+	// --- Render active screen sized to exactly contentH ---
+	var screenView string
 	switch m.screen {
 	case ScreenDashboard:
-		screenView = m.dashboard.View()
+		// Use a local copy so View() stays pure (no persistent mutation).
+		dash := m.dashboard
+		dash.SetContentHeight(contentH)
+		screenView = dash.View()
 	case ScreenAddRoute:
 		screenView = m.addRoute.View()
 	case ScreenSettings:
@@ -214,48 +292,47 @@ func (m AppModel) View() string {
 		screenView = m.logs.View()
 	}
 
-	// Apply transition offset (slide-up)
+	// Apply transition offset (slide-up) — prepend blank rows during animation.
 	if m.transActive && m.transOffset > 0 {
+		offset := m.transOffset
+		if offset > contentH {
+			offset = contentH
+		}
 		placeholder := lipgloss.NewStyle().
-			Height(m.transOffset).
+			Height(offset).
 			Width(m.width).
 			Background(styles.ColorBg).
 			Render("")
 		screenView = lipgloss.JoinVertical(lipgloss.Left, placeholder, screenView)
 	}
 
-	// Status message bar — uses accent color for info/detect messages, green for confirmations
-	if m.status != "" {
-		prefix := "  ✦ "
-		fg := styles.ColorAccent
-		// Switch to green checkmark for success-style messages
-		if strings.HasPrefix(m.status, "✓") || strings.HasSuffix(m.status, "!") {
-			prefix = "  ✓ "
-			fg = styles.ColorSuccess
-		}
-		statusBar := lipgloss.NewStyle().
-			Background(styles.ColorSurface).
-			Foreground(fg).
-			Width(m.width).
-			Padding(0, 1).
-			Render(prefix + m.status)
-		screenView = lipgloss.JoinVertical(lipgloss.Left,
-			components.Header(m.width, "The All-Father of Local DNS"),
-			screenView,
-			statusBar,
-		)
-	} else {
-		screenView = lipgloss.JoinVertical(lipgloss.Left,
-			components.Header(m.width, "The All-Father of Local DNS"),
-			screenView,
-		)
+	// --- Stack into final frame ---
+	parts := []string{headerView, screenView}
+	if statusView != "" {
+		parts = append(parts, statusView)
 	}
+	parts = append(parts, footerView)
+	return lipgloss.JoinVertical(lipgloss.Left, parts...)
+}
 
-	return lipgloss.NewStyle().
-		Width(m.width).
-		Height(m.height).
-		Background(styles.ColorBg).
-		Render(screenView)
+// hintsForScreen returns context-appropriate key hints for the footer.
+func hintsForScreen(s Screen) []components.KeyHint {
+	switch s {
+	case ScreenDashboard:
+		return []components.KeyHint{
+			{Key: "a", Desc: "adicionar"},
+			{Key: "u", Desc: "odins up"},
+			{Key: "d", Desc: "remover"},
+			{Key: "s", Desc: "settings"},
+			{Key: "l", Desc: "logs"},
+			{Key: "q", Desc: "sair"},
+		}
+	default:
+		return []components.KeyHint{
+			{Key: "esc", Desc: "voltar"},
+			{Key: "q", Desc: "sair"},
+		}
+	}
 }
 
 func (m AppModel) navigateTo(s Screen) (AppModel, tea.Cmd) {
@@ -311,6 +388,87 @@ func (m AppModel) handleDeleteRoute(subdomain string) (AppModel, tea.Cmd) {
 	}
 	m.dashboard.SetRoutes(m.store.Routes)
 	return m, nil
+}
+
+// UpDoneMsg carries the result of running odins up from the TUI.
+type UpDoneMsg struct {
+	Applied int
+	Err     error
+}
+
+// odinsUpCmd runs the equivalent of `odins up` as a background tea.Cmd.
+func odinsUpCmd(cfg config.GlobalConfig, store *state.Store) tea.Cmd {
+	return func() tea.Msg {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return UpDoneMsg{Err: err}
+		}
+
+		var routes []config.RouteConfig
+		var projName, projRuntime, projDomain string
+
+		projectCfgPath := filepath.Join(cwd, config.ProjectConfigFile)
+
+		if config.ExistsProject(cwd) {
+			projCfg, err := config.LoadProject(projectCfgPath)
+			if err != nil {
+				return UpDoneMsg{Err: fmt.Errorf("ler .odins: %w", err)}
+			}
+			routes = projCfg.Routes
+			projName = projCfg.Project.Name
+			projRuntime = projCfg.Project.Runtime
+			projDomain = projCfg.Project.Domain
+		} else {
+			d := detect.Project(cwd)
+			if d.Runtime == "unknown" {
+				return UpDoneMsg{Err: fmt.Errorf("projeto não detectado em %s", cwd)}
+			}
+			projName = d.Name
+			projRuntime = d.Runtime
+			routes = []config.RouteConfig{{Subdomain: d.Name, Port: d.Port, HTTPS: true}}
+
+			projCfg := config.ProjectConfig{
+				Project: config.ProjectInfo{Name: d.Name, Runtime: d.Runtime, Framework: d.Framework},
+				Routes:  routes,
+			}
+			_ = config.SaveProject(projectCfgPath, projCfg)
+		}
+
+		applied := 0
+		for _, rc := range routes {
+			fqdn := tuiUpFQDN(rc.Subdomain, projDomain, projName, cfg.TLD)
+			r := state.Route{
+				ID:              "odins-" + fqdn,
+				Subdomain:       fqdn,
+				Port:            rc.Port,
+				Project:         projName,
+				Runtime:         projRuntime,
+				Domain:          projDomain,
+				DockerContainer: rc.DockerContainer,
+				HTTPS:           rc.HTTPS,
+				CreatedAt:       time.Now(),
+			}
+			if err := addToProxy(cfg, r); err != nil {
+				continue
+			}
+			store.Add(r)
+			applied++
+		}
+		_ = store.Save()
+		return UpDoneMsg{Applied: applied}
+	}
+}
+
+func tuiUpFQDN(subdomain, domain, project, tld string) string {
+	if domain != "" {
+		return subdomain + "." + domain + "." + tld
+	}
+	for _, c := range subdomain {
+		if c == '.' {
+			return subdomain + "." + tld
+		}
+	}
+	return subdomain + "." + project + "." + tld
 }
 
 func transitionTick() tea.Cmd {

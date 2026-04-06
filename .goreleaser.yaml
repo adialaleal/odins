@@ -31,7 +31,11 @@ archives:
     files:
       - LICENSE
       - README.md
+      - AGENTS.md
+      - CLAUDE.md
       - .odins
+      - docs/ai/**
+      - ai/**
 
 brews:
   - name: odins
@@ -39,7 +43,7 @@ brews:
       owner: adialaleal
       name: homebrew-odins
       branch: main
-      token: "{{ .Env.GITHUB_TOKEN }}"
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     directory: Formula
     homepage: "https://github.com/adialaleal/odins"
     description: "The All-Father of Local DNS — Local DNS + Reverse Proxy manager for macOS"

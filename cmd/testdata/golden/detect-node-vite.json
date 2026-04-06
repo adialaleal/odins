@@ -1,0 +1,33 @@
+{
+  "command": "detect",
+  "data": {
+    "detected": {
+      "framework": "vite",
+      "has_compose": false,
+      "has_docker": false,
+      "name": "node-vite",
+      "port": 4173,
+      "runtime": "node",
+      "start_cmd": "npm run dev"
+    },
+    "directory": "$FIXTURE_DIR",
+    "project_config_exists": false,
+    "project_config_path": "$FIXTURE_DIR/.odins",
+    "recommended_config": {
+      "project": {
+        "framework": "vite",
+        "name": "node-vite",
+        "runtime": "node"
+      },
+      "routes": [
+        {
+          "https": true,
+          "port": 4173,
+          "subdomain": "node-vite"
+        }
+      ]
+    }
+  },
+  "ok": true,
+  "warnings": []
+}

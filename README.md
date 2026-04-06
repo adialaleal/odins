@@ -32,24 +32,49 @@ curl -fsSL https://raw.githubusercontent.com/adialaleal/odins/main/install.sh | 
 
 ---
 
+## AI Friendly
+
+ODINS agora expõe uma superfície oficial para agentes via `CLI + JSON + docs`.
+
+- Use `odins detect --json` para inspecionar um projeto sem alterar arquivos.
+- Use `odins doctor --json` para diagnosticar DNS, proxy, HTTPS e store.
+- Use `--json` nos comandos operacionais para saídas estáveis em automação.
+- Consulte [AGENTS.md](AGENTS.md), [CLAUDE.md](CLAUDE.md) e [`ai/`](ai/) para os adapters publicados.
+
+Documentação canônica:
+
+- [docs/ai/setup-local.md](docs/ai/setup-local.md)
+- [docs/ai/apply-to-project.md](docs/ai/apply-to-project.md)
+- [docs/ai/workspace-multi-service.md](docs/ai/workspace-multi-service.md)
+- [docs/ai/doctor-troubleshoot.md](docs/ai/doctor-troubleshoot.md)
+
+---
+
 ## Quick Start
 
 ```bash
 # 1. One-time setup (installs dnsmasq + caddy, configures DNS and HTTPS)
 odins init
 
-# 2. In any project directory
+# 2. Inspect any project first
+cd ~/Projects/rankly/api
+odins detect --json
+
+# 3. Apply routes in the project directory
 cd ~/Projects/rankly/api
 odins up   # auto-detects Node.js/Go/Python and creates .odins
 
-# 3. Open your browser
+# 4. Open your browser
 open https://api.rankly.odin
 
-# 4. Manage routes
+# 5. Manage routes
 odins ls
 odins kill api.rankly.odin
 
-# 5. TUI dashboard
+# 6. Validate the local environment
+odins doctor
+
+# 7. TUI dashboard
 odins
 ```
 
@@ -77,11 +102,27 @@ Choose your preferred TLD during `odins init`. All are supported:
 |---------|-------------|
 | `odins` | Open TUI dashboard |
 | `odins init` | One-time setup: DNS, proxy, HTTPS |
+| `odins detect` | Inspect project runtime/framework/port and recommend a `.odins` |
 | `odins up` | Apply routes from `.odins` in current directory |
 | `odins down` | Remove all routes for current project |
 | `odins add <subdomain> --port <port>` | Add a single route |
 | `odins kill <subdomain>` | Remove a route |
 | `odins ls` | List all active routes |
+| `odins doctor` | Diagnose Homebrew, DNS, proxy, HTTPS and store health |
+| `odins domain add <name>` | Create a workspace domain landing page |
+| `odins domain ls` | List workspace domains |
+| `odins domain rm <name>` | Remove a workspace domain |
+
+### Machine-readable mode
+
+All operational commands support `--json`.
+
+```bash
+odins detect --json
+odins ls --json
+odins doctor --json
+odins init --json --non-interactive --tld odin --backend caddy
+```
 
 ### `odins add` flags
 
@@ -122,6 +163,36 @@ https = true
 ```
 
 Then run `odins up` from any directory in your project.
+
+---
+
+## Prompt Recipes
+
+Copy and paste one of these prompts into your AI coding tool:
+
+### Detect a project
+
+```text
+Explore este repositório primeiro. Depois rode `odins detect --json` na raiz do projeto, resuma runtime/framework/porta detectados e proponha o `.odins` recomendado sem aplicar mudanças ainda.
+```
+
+### Propose and apply `.odins`
+
+```text
+Explore este projeto, rode `odins detect --json`, proponha o `.odins` ideal e só depois aplique com `odins up`. Se houver qualquer ação com sudo, me avise antes.
+```
+
+### Connect to a workspace domain
+
+```text
+Explore o projeto, sugira como conectá-lo a um workspace ODINS existente ou novo usando `odins domain add` e o campo `domain` no `.odins`. Prefira `odins detect --json` antes de qualquer mudança.
+```
+
+### Validate the environment
+
+```text
+Rode `odins doctor --json`, explique cada check com problema e proponha a próxima ação mínima para deixar o ambiente saudável.
+```
 
 ---
 
@@ -205,12 +276,14 @@ Browser → *.rankly.odin
 
 **DNS not resolving?**
 ```bash
+odins doctor
 brew services restart dnsmasq
 scutil --dns | grep odin   # should show nameserver 127.0.0.1
 ```
 
 **Caddy not starting?**
 ```bash
+odins doctor --json
 brew services restart caddy
 curl http://localhost:2019/config/   # Caddy Admin API
 ```

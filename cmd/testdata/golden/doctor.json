@@ -1,0 +1,97 @@
+{
+  "command": "doctor",
+  "data": {
+    "checks": [
+      {
+        "action": "Use o ODINS em uma máquina macOS.",
+        "details": "Sistema operacional atual: darwin",
+        "name": "platform",
+        "ok": true,
+        "status": "supported"
+      },
+      {
+        "action": "Instale o Homebrew em https://brew.sh e rode `odins init` novamente.",
+        "details": "Homebrew é usado para instalar dnsmasq e o proxy local.",
+        "name": "homebrew",
+        "ok": true,
+        "status": "installed"
+      },
+      {
+        "action": "Rode `odins init` para gerar a configuração global.",
+        "details": "Arquivo esperado em $TMP/config/odins/config.toml",
+        "name": "global_config",
+        "ok": true,
+        "status": "present"
+      },
+      {
+        "action": "Rode `odins init` para instalar o dnsmasq.",
+        "details": "dnsmasq fornece a resolução wildcard local.",
+        "name": "dnsmasq_formula",
+        "ok": true,
+        "status": "installed"
+      },
+      {
+        "action": "Rode `brew services restart dnsmasq` ou `odins init`.",
+        "details": "Serviço Homebrew `dnsmasq`.",
+        "name": "dnsmasq_service",
+        "ok": true,
+        "status": "running"
+      },
+      {
+        "action": "Rode `odins init` para gerar a configuração do dnsmasq.",
+        "details": "Arquivo esperado em $TMP/config/odins/dnsmasq.conf",
+        "name": "dnsmasq_config",
+        "ok": true,
+        "status": "present"
+      },
+      {
+        "action": "Rode `odins init` para criar o resolver local.",
+        "details": "Arquivo esperado em /tmp/odins-test/resolver/odin",
+        "name": "resolver",
+        "ok": true,
+        "status": "present"
+      },
+      {
+        "action": "Rode `odins init --backend caddy` para instalar o proxy configurado.",
+        "details": "Backend configurado: caddy",
+        "name": "proxy_formula",
+        "ok": true,
+        "status": "installed"
+      },
+      {
+        "action": "Inicie ou reinicie o proxy configurado e rode `odins doctor` novamente.",
+        "details": "Serviço do backend caddy",
+        "name": "proxy_service",
+        "ok": true,
+        "status": "running"
+      },
+      {
+        "details": "CA local do Caddy encontrada em $TMP/caddy/root.crt",
+        "name": "certificates",
+        "ok": true,
+        "status": "ready"
+      },
+      {
+        "action": "Apague ou corrija o arquivo de store se ele estiver corrompido.",
+        "details": "Store ainda não existe; ele será criado na primeira rota salva.",
+        "name": "store",
+        "ok": true,
+        "status": "ready"
+      }
+    ],
+    "config": {
+      "caddy_admin": "http://localhost:2019",
+      "dnsmasq_port": 5353,
+      "http_port": 80,
+      "https_port": 443,
+      "onboarding_done": false,
+      "proxy_backend": "caddy",
+      "tld": "odin"
+    },
+    "healthy": true
+  },
+  "ok": true,
+  "warnings": [
+    "Nenhuma rota ativa encontrada; isso é normal se você ainda não rodou `odins up` ou `odins add`."
+  ]
+}
