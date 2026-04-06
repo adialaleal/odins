@@ -29,6 +29,7 @@ var (
 	addPort    int
 	addDocker  string
 	addProject string
+	addDomain  string
 	addNoHTTPS bool
 )
 
@@ -36,6 +37,7 @@ func init() {
 	addCmd.Flags().IntVarP(&addPort, "port", "p", 0, "Local port to proxy (required)")
 	addCmd.Flags().StringVarP(&addDocker, "docker", "d", "", "Docker container name")
 	addCmd.Flags().StringVar(&addProject, "project", "", "Project name (inferred from subdomain if not set)")
+	addCmd.Flags().StringVar(&addDomain, "domain", "", "Domain workspace (e.g. tatoh → tatoh.odins)")
 	addCmd.Flags().BoolVar(&addNoHTTPS, "no-https", false, "Disable HTTPS for this route")
 	addCmd.MarkFlagRequired("port")
 }
@@ -64,6 +66,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		Subdomain:       subdomain,
 		Port:            addPort,
 		Project:         project,
+		Domain:          addDomain,
 		DockerContainer: addDocker,
 		HTTPS:           !addNoHTTPS,
 		CreatedAt:       time.Now(),
@@ -82,6 +85,11 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	store.Add(r)
 	if err := store.Save(); err != nil {
 		return err
+	}
+
+	// Regenerate landing page if attached to a domain
+	if addDomain != "" {
+		regeneratePageForDomain(cfg, store, addDomain)
 	}
 
 	proto := "https"

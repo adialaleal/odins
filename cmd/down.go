@@ -49,9 +49,11 @@ func runDown(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	domain := projCfg.Project.Domain
+
 	removed := 0
 	for _, rc := range projCfg.Routes {
-		fqdn := buildFQDN(rc.Subdomain, projCfg.Project.Name, globalCfg.TLD)
+		fqdn := buildFQDN(rc.Subdomain, domain, projCfg.Project.Name, globalCfg.TLD)
 		if err := proxyRemove(globalCfg, fqdn); err != nil {
 			fmt.Printf("  ⚠  %s: %v\n", fqdn, err)
 		}
@@ -62,6 +64,12 @@ func runDown(cmd *cobra.Command, args []string) error {
 
 	if err := store.Save(); err != nil {
 		return err
+	}
+
+	// Regenerate landing page if project belonged to a domain
+	if domain != "" {
+		regeneratePageForDomain(globalCfg, store, domain)
+		fmt.Printf("  → Landing page atualizada: https://%s.%s\n", domain, globalCfg.TLD)
 	}
 
 	fmt.Printf("\n  %d rota(s) removida(s) para '%s'\n", removed, projCfg.Project.Name)
