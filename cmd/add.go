@@ -60,6 +60,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	r := state.Route{
+		ID:              "odins-" + subdomain,
 		Subdomain:       subdomain,
 		Port:            addPort,
 		Project:         project,

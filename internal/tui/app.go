@@ -4,13 +4,15 @@ package tui
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/adialaleal/odins/internal/config"
 	"github.com/adialaleal/odins/internal/detect"
+	"github.com/adialaleal/odins/internal/proxy/apache"
 	"github.com/adialaleal/odins/internal/proxy/caddy"
 	"github.com/adialaleal/odins/internal/proxy/nginx"
-	"github.com/adialaleal/odins/internal/proxy/apache"
 	"github.com/adialaleal/odins/internal/state"
 	"github.com/adialaleal/odins/internal/tui/components"
 	"github.com/adialaleal/odins/internal/tui/screens"
@@ -144,6 +146,11 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.screen == ScreenDashboard {
 				return m, tea.Quit
 			}
+		case "u":
+			if m.screen == ScreenDashboard {
+				m.status = "Ativando rotas..."
+				return m, odinsUpCmd(m.cfg, m.store)
+			}
 		case "a":
 			if m.screen == ScreenDashboard {
 				return m.navigateTo(ScreenAddRoute)
@@ -181,6 +188,17 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case screens.AddRouteCancelMsg:
 		return m.navigateTo(ScreenDashboard)
+
+	case UpDoneMsg:
+		if msg.Err != nil {
+			m.status = "Erro: " + msg.Err.Error()
+		} else if msg.Applied == 0 {
+			m.status = "Nenhuma rota aplicada"
+		} else {
+			m.status = fmt.Sprintf("✓ %d rota(s) ativada(s)!", msg.Applied)
+		}
+		m.dashboard.SetRoutes(m.store.Routes)
+		return m, nil
 
 	case screens.SettingsSavedMsg:
 		m.cfg = msg.Config
@@ -336,6 +354,82 @@ func (m AppModel) handleDeleteRoute(subdomain string) (AppModel, tea.Cmd) {
 	}
 	m.dashboard.SetRoutes(m.store.Routes)
 	return m, nil
+}
+
+// UpDoneMsg carries the result of running odins up from the TUI.
+type UpDoneMsg struct {
+	Applied int
+	Err     error
+}
+
+// odinsUpCmd runs the equivalent of `odins up` as a background tea.Cmd.
+func odinsUpCmd(cfg config.GlobalConfig, store *state.Store) tea.Cmd {
+	return func() tea.Msg {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return UpDoneMsg{Err: err}
+		}
+
+		var routes []config.RouteConfig
+		var projName, projRuntime string
+
+		projectCfgPath := filepath.Join(cwd, config.ProjectConfigFile)
+
+		if config.ExistsProject(cwd) {
+			projCfg, err := config.LoadProject(projectCfgPath)
+			if err != nil {
+				return UpDoneMsg{Err: fmt.Errorf("ler .odins: %w", err)}
+			}
+			routes = projCfg.Routes
+			projName = projCfg.Project.Name
+			projRuntime = projCfg.Project.Runtime
+		} else {
+			d := detect.Project(cwd)
+			if d.Runtime == "unknown" {
+				return UpDoneMsg{Err: fmt.Errorf("projeto não detectado em %s", cwd)}
+			}
+			projName = d.Name
+			projRuntime = d.Runtime
+			routes = []config.RouteConfig{{Subdomain: d.Name, Port: d.Port, HTTPS: true}}
+
+			projCfg := config.ProjectConfig{
+				Project: config.ProjectInfo{Name: d.Name, Runtime: d.Runtime, Framework: d.Framework},
+				Routes:  routes,
+			}
+			_ = config.SaveProject(projectCfgPath, projCfg)
+		}
+
+		applied := 0
+		for _, rc := range routes {
+			fqdn := tuiUpFQDN(rc.Subdomain, projName, cfg.TLD)
+			r := state.Route{
+				ID:              "odins-" + fqdn,
+				Subdomain:       fqdn,
+				Port:            rc.Port,
+				Project:         projName,
+				Runtime:         projRuntime,
+				DockerContainer: rc.DockerContainer,
+				HTTPS:           rc.HTTPS,
+				CreatedAt:       time.Now(),
+			}
+			if err := addToProxy(cfg, r); err != nil {
+				continue
+			}
+			store.Add(r)
+			applied++
+		}
+		_ = store.Save()
+		return UpDoneMsg{Applied: applied}
+	}
+}
+
+func tuiUpFQDN(subdomain, project, tld string) string {
+	for _, c := range subdomain {
+		if c == '.' {
+			return subdomain + "." + tld
+		}
+	}
+	return subdomain + "." + project + "." + tld
 }
 
 func transitionTick() tea.Cmd {
