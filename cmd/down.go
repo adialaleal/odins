@@ -6,9 +6,10 @@ import (
 	"path/filepath"
 
 	"github.com/adialaleal/odins/internal/config"
+	"github.com/adialaleal/odins/internal/i18n"
+	"github.com/adialaleal/odins/internal/proxy/apache"
 	"github.com/adialaleal/odins/internal/proxy/caddy"
 	"github.com/adialaleal/odins/internal/proxy/nginx"
-	"github.com/adialaleal/odins/internal/proxy/apache"
 	"github.com/adialaleal/odins/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -31,7 +32,7 @@ func runDown(cmd *cobra.Command, args []string) error {
 
 	projectCfgPath := filepath.Join(dir, config.ProjectConfigFile)
 	if !config.ExistsProject(dir) {
-		return fmt.Errorf(".odins não encontrado em %s", dir)
+		return fmt.Errorf("%s", i18n.Tf("down.no_project", dir))
 	}
 
 	projCfg, err := config.LoadProject(projectCfgPath)
@@ -50,15 +51,18 @@ func runDown(cmd *cobra.Command, args []string) error {
 	}
 
 	domain := projCfg.Project.Domain
+	if domain == "" {
+		domain = projCfg.Project.Name
+	}
 
 	removed := 0
 	for _, rc := range projCfg.Routes {
 		fqdn := buildFQDN(rc.Subdomain, domain, projCfg.Project.Name, globalCfg.TLD)
 		if err := proxyRemove(globalCfg, fqdn); err != nil {
-			fmt.Printf("  ⚠  %s: %v\n", fqdn, err)
+			fmt.Println("  " + i18n.Tf("down.proxy_warn", fqdn, err))
 		}
 		store.Remove(fqdn)
-		fmt.Printf("  ✓ %s removido\n", fqdn)
+		fmt.Println("  " + i18n.Tf("down.removed", fqdn))
 		removed++
 	}
 
@@ -69,10 +73,11 @@ func runDown(cmd *cobra.Command, args []string) error {
 	// Regenerate landing page if project belonged to a domain
 	if domain != "" {
 		regeneratePageForDomain(globalCfg, store, domain)
-		fmt.Printf("  → Landing page atualizada: https://%s.%s\n", domain, globalCfg.TLD)
+		fmt.Println("  " + i18n.Tf("down.page_updated", domain, globalCfg.TLD))
 	}
 
-	fmt.Printf("\n  %d rota(s) removida(s) para '%s'\n", removed, projCfg.Project.Name)
+	fmt.Println()
+	fmt.Println("  " + i18n.Tf("down.total", removed, projCfg.Project.Name))
 	return nil
 }
 

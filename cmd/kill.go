@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/adialaleal/odins/internal/config"
+	"github.com/adialaleal/odins/internal/i18n"
 	"github.com/adialaleal/odins/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -35,13 +36,13 @@ func runKill(cmd *cobra.Command, args []string) error {
 
 	route, ok := store.Get(subdomain)
 	if !ok {
-		return fmt.Errorf("rota '%s' não encontrada", subdomain)
+		return fmt.Errorf("%s", i18n.Tf("kill.not_found", subdomain))
 	}
 
 	domainName := route.Domain
 
 	if err := proxyRemove(cfg, subdomain); err != nil {
-		fmt.Printf("  ⚠  proxy remove: %v\n", err)
+		fmt.Println("  " + i18n.Tf("kill.proxy_warn", err))
 	}
 
 	store.Remove(subdomain)
@@ -54,6 +55,6 @@ func runKill(cmd *cobra.Command, args []string) error {
 		regeneratePageForDomain(cfg, store, domainName)
 	}
 
-	fmt.Printf("  ✓ %s removido\n", subdomain)
+	fmt.Println("  " + i18n.Tf("kill.removed", subdomain))
 	return nil
 }

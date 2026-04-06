@@ -10,6 +10,7 @@ import (
 
 	"github.com/adialaleal/odins/internal/config"
 	"github.com/adialaleal/odins/internal/detect"
+	"github.com/adialaleal/odins/internal/i18n"
 	"github.com/adialaleal/odins/internal/proxy/apache"
 	"github.com/adialaleal/odins/internal/proxy/caddy"
 	"github.com/adialaleal/odins/internal/proxy/nginx"
@@ -79,12 +80,10 @@ func Run() error {
 	if !config.ExistsProject(cwd) {
 		d := detect.Project(cwd)
 		if d.Runtime != "unknown" {
-			autoStatus = fmt.Sprintf(
-				"Projeto '%s' (%s/%s, porta %d) detectado — pressione [u] para ativar as rotas",
-				d.Name, d.Runtime, d.Framework, d.Port,
-			)
+			autoStatus = i18n.Tf("tui.detected",
+				d.Name, d.Runtime, d.Framework, d.Port)
 		} else {
-			autoStatus = "Nenhum .odins encontrado — pressione [a] para adicionar uma rota manualmente"
+			autoStatus = i18n.T("tui.no_project")
 		}
 	}
 
@@ -148,7 +147,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "u":
 			if m.screen == ScreenDashboard {
-				m.status = "Ativando rotas..."
+				m.status = i18n.T("tui.activating")
 				return m, odinsUpCmd(m.cfg, m.store)
 			}
 		case "a":
@@ -191,11 +190,11 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case UpDoneMsg:
 		if msg.Err != nil {
-			m.status = "Erro: " + msg.Err.Error()
+			m.status = i18n.Tf("tui.error", msg.Err.Error())
 		} else if msg.Applied == 0 {
-			m.status = "Nenhuma rota aplicada"
+			m.status = i18n.T("tui.no_routes")
 		} else {
-			m.status = fmt.Sprintf("✓ %d rota(s) ativada(s)!", msg.Applied)
+			m.status = i18n.Tf("tui.routes_activated", msg.Applied)
 		}
 		m.dashboard.SetRoutes(m.store.Routes)
 		return m, nil
@@ -203,9 +202,9 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case screens.SettingsSavedMsg:
 		m.cfg = msg.Config
 		if err := config.SaveGlobal(m.cfg); err != nil {
-			m.status = "Erro ao salvar config: " + err.Error()
+			m.status = i18n.Tf("tui.config_save_err", err.Error())
 		} else {
-			m.status = "Configurações salvas!"
+			m.status = i18n.T("tui.config_saved")
 		}
 		return m.navigateTo(ScreenDashboard)
 	}
@@ -320,17 +319,17 @@ func hintsForScreen(s Screen) []components.KeyHint {
 	switch s {
 	case ScreenDashboard:
 		return []components.KeyHint{
-			{Key: "a", Desc: "adicionar"},
-			{Key: "u", Desc: "odins up"},
-			{Key: "d", Desc: "remover"},
-			{Key: "s", Desc: "settings"},
-			{Key: "l", Desc: "logs"},
-			{Key: "q", Desc: "sair"},
+			{Key: "a", Desc: i18n.T("hint.add")},
+			{Key: "u", Desc: i18n.T("hint.up")},
+			{Key: "d", Desc: i18n.T("hint.remove")},
+			{Key: "s", Desc: i18n.T("hint.settings")},
+			{Key: "l", Desc: i18n.T("hint.logs")},
+			{Key: "q", Desc: i18n.T("hint.quit")},
 		}
 	default:
 		return []components.KeyHint{
-			{Key: "esc", Desc: "voltar"},
-			{Key: "q", Desc: "sair"},
+			{Key: "esc", Desc: i18n.T("hint.back")},
+			{Key: "q", Desc: i18n.T("hint.quit")},
 		}
 	}
 }
@@ -362,12 +361,12 @@ func (m AppModel) handleAddRoute(r state.Route) (AppModel, tea.Cmd) {
 
 	m.store.Add(r)
 	if err := m.store.Save(); err != nil {
-		m.status = "Erro ao salvar: " + err.Error()
+		m.status = i18n.Tf("tui.save_error", err.Error())
 	} else {
 		if err := addToProxy(m.cfg, r); err != nil {
-			m.status = "Erro no proxy: " + err.Error()
+			m.status = i18n.Tf("tui.proxy_error", err.Error())
 		} else {
-			m.status = fmt.Sprintf("✓ %s → :%d adicionado!", r.Subdomain, r.Port)
+			m.status = i18n.Tf("tui.route_added", r.Subdomain, r.Port)
 		}
 	}
 
@@ -378,12 +377,12 @@ func (m AppModel) handleAddRoute(r state.Route) (AppModel, tea.Cmd) {
 func (m AppModel) handleDeleteRoute(subdomain string) (AppModel, tea.Cmd) {
 	m.store.Remove(subdomain)
 	if err := m.store.Save(); err != nil {
-		m.status = "Erro ao salvar: " + err.Error()
+		m.status = i18n.Tf("tui.save_error", err.Error())
 	} else {
 		if err := removeFromProxy(m.cfg, subdomain); err != nil {
-			m.status = "Proxy error: " + err.Error()
+			m.status = i18n.Tf("tui.proxy_error", err.Error())
 		} else {
-			m.status = subdomain + " removido."
+			m.status = i18n.Tf("tui.route_removed", subdomain)
 		}
 	}
 	m.dashboard.SetRoutes(m.store.Routes)
@@ -412,7 +411,7 @@ func odinsUpCmd(cfg config.GlobalConfig, store *state.Store) tea.Cmd {
 		if config.ExistsProject(cwd) {
 			projCfg, err := config.LoadProject(projectCfgPath)
 			if err != nil {
-				return UpDoneMsg{Err: fmt.Errorf("ler .odins: %w", err)}
+				return UpDoneMsg{Err: fmt.Errorf("%s", i18n.Tf("tui.read_project_err", err.Error()))}
 			}
 			routes = projCfg.Routes
 			projName = projCfg.Project.Name
@@ -421,7 +420,7 @@ func odinsUpCmd(cfg config.GlobalConfig, store *state.Store) tea.Cmd {
 		} else {
 			d := detect.Project(cwd)
 			if d.Runtime == "unknown" {
-				return UpDoneMsg{Err: fmt.Errorf("projeto não detectado em %s", cwd)}
+				return UpDoneMsg{Err: fmt.Errorf("%s", i18n.Tf("tui.no_detect", cwd))}
 			}
 			projName = d.Name
 			projRuntime = d.Runtime

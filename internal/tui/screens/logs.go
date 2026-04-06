@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/adialaleal/odins/internal/i18n"
 	"github.com/adialaleal/odins/internal/tui/components"
 	"github.com/adialaleal/odins/internal/tui/styles"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -74,11 +75,11 @@ func (m LogsModel) Update(msg tea.Msg) (LogsModel, tea.Cmd) {
 
 // View renders the logs screen.
 func (m LogsModel) View() string {
-	titleBar := components.TitleBar(m.width, "Logs do Proxy", m.logPath)
+	titleBar := components.TitleBar(m.width, i18n.T("logs.title"), m.logPath)
 
 	hints := []components.KeyHint{
-		{Key: "↑/↓", Desc: "scroll"},
-		{Key: "Esc", Desc: "voltar"},
+		{Key: "↑/↓", Desc: i18n.T("hint.scroll")},
+		{Key: "Esc", Desc: i18n.T("hint.back")},
 	}
 	footer := components.Footer(m.width, hints)
 

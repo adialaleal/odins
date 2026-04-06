@@ -2,10 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"text/tabwriter"
 	"os"
+	"text/tabwriter"
 
 	"github.com/adialaleal/odins/internal/docker"
+	"github.com/adialaleal/odins/internal/i18n"
 	"github.com/adialaleal/odins/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -24,7 +25,7 @@ func runLs(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(store.Routes) == 0 {
-		fmt.Println("  Nenhuma rota ativa. Use 'odins add' ou 'odins up' para adicionar.")
+		fmt.Println("  " + i18n.T("ls.empty"))
 		return nil
 	}
 

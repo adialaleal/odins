@@ -8,6 +8,7 @@ import (
 
 	"github.com/adialaleal/odins/internal/config"
 	"github.com/adialaleal/odins/internal/detect"
+	"github.com/adialaleal/odins/internal/i18n"
 	"github.com/adialaleal/odins/internal/state"
 	"github.com/spf13/cobra"
 )
@@ -57,26 +58,26 @@ func runUp(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("read .odins: %w", err)
 		}
-		fmt.Printf("  → Lendo .odins do projeto '%s'\n", projCfg.Project.Name)
+		fmt.Println("  " + i18n.Tf("up.reading", projCfg.Project.Name))
 	} else {
 		// Auto-detect project
-		fmt.Println("  → .odins não encontrado, detectando projeto...")
+		fmt.Println("  " + i18n.T("up.detecting"))
 		d := detect.Project(dir)
 
 		if d.Runtime == "unknown" {
-			return fmt.Errorf("não foi possível detectar o tipo de projeto em %s\n"+
-				"Crie um .odins manualmente ou use: odins add <subdomain> --port <port>", dir)
+			return fmt.Errorf("%s", i18n.Tf("up.not_detected", dir))
 		}
 
-		fmt.Printf("  → Detectado: %s/%s (porta %d)\n", d.Runtime, d.Framework, d.Port)
-		fmt.Printf("  → Comando de start: %s\n", d.StartCmd)
+		fmt.Println("  " + i18n.Tf("up.detected", d.Runtime, d.Framework, d.Port))
+		fmt.Println("  " + i18n.Tf("up.start_cmd", d.StartCmd))
 
-		// Build default project config
+		// Build default project config — use project name as domain automatically
 		projCfg = config.ProjectConfig{
 			Project: config.ProjectInfo{
 				Name:      d.Name,
 				Runtime:   d.Runtime,
 				Framework: d.Framework,
+				Domain:    d.Name, // project name IS the domain
 			},
 			Routes: []config.RouteConfig{
 				{
@@ -89,9 +90,9 @@ func runUp(cmd *cobra.Command, args []string) error {
 
 		// Save the generated .odins
 		if err := config.SaveProject(projectCfgPath, projCfg); err != nil {
-			fmt.Printf("  ⚠  Não foi possível salvar .odins: %v\n", err)
+			fmt.Println("  " + i18n.Tf("up.save_warn", err))
 		} else {
-			fmt.Printf("  → .odins criado em %s\n", projectCfgPath)
+			fmt.Println("  " + i18n.Tf("up.created", projectCfgPath))
 		}
 	}
 
@@ -102,8 +103,13 @@ func runUp(cmd *cobra.Command, args []string) error {
 	}
 
 	domain := projCfg.Project.Domain
+	// If no explicit domain set, use project name as domain (project.odins style)
+	if domain == "" {
+		domain = projCfg.Project.Name
+	}
+
 	if domain != "" {
-		fmt.Printf("  → Domínio: %s.%s\n", domain, cfg.TLD)
+		fmt.Println("  " + i18n.Tf("up.domain", domain, cfg.TLD))
 	}
 
 	applied := 0
@@ -123,7 +129,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 		}
 
 		if err := proxyAdd(cfg, r); err != nil {
-			fmt.Printf("  ✗ %s: %v\n", fqdn, err)
+			fmt.Println("  " + i18n.Tf("up.route_error", fqdn, err))
 			continue
 		}
 
@@ -133,7 +139,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 		if !r.HTTPS {
 			proto = "http"
 		}
-		fmt.Printf("  ✓ %s://%s → :%d\n", proto, fqdn, rc.Port)
+		fmt.Println("  " + i18n.Tf("up.route_ok", proto, fqdn, rc.Port))
 		applied++
 	}
 
@@ -144,17 +150,18 @@ func runUp(cmd *cobra.Command, args []string) error {
 	// Regenerate landing page if this project is attached to a domain
 	if domain != "" {
 		regeneratePageForDomain(cfg, store, domain)
-		fmt.Printf("  → Landing page atualizada: https://%s.%s\n", domain, cfg.TLD)
+		fmt.Println("  " + i18n.Tf("up.page_updated", domain, cfg.TLD))
 	}
 
-	fmt.Printf("\n  %d rota(s) ativada(s) para '%s'\n", applied, projCfg.Project.Name)
+	fmt.Println()
+	fmt.Println("  " + i18n.Tf("up.applied", applied, projCfg.Project.Name))
 	return nil
 }
 
 // buildFQDN constructs the full FQDN for a route.
-//   - If domain is set:    subdomain.domain.tld   (e.g. web.tatoh.odins)
-//   - If subdomain has a dot: subdomain.tld        (e.g. api.rankly.odins)
-//   - Otherwise:           subdomain.project.tld   (e.g. web.rankly_web.odins)
+//   - If domain is set:         subdomain.domain.tld   (e.g. web.project.odins)
+//   - If subdomain has a dot:   subdomain.tld           (e.g. api.rankly.odins)
+//   - Otherwise:                subdomain.project.tld   (e.g. web.project.odins)
 func buildFQDN(subdomain, domain, project, tld string) string {
 	if domain != "" {
 		return subdomain + "." + domain + "." + tld

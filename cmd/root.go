@@ -18,21 +18,33 @@ Stop fighting with ports. Route your local projects to beautiful subdomains
 with automatic HTTPS. Works with Node.js, Go, Python, Docker, and more.
 
   odins init              — one-time setup (DNS, proxy, HTTPS)
-  odins domain add tatoh  — criar workspace tatoh.odins
+  odins domain add <proj> — create workspace <proj>.odins
   odins up                — read .odins config and apply routes
   odins add <domain>      — add a single route
   odins ls                — list active routes
   odins kill <domain>     — remove a route
-  odins welcome           — guia de onboarding
+  odins welcome           — onboarding guide
   odins                   — open the TUI dashboard`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// First-run detection: show welcome before TUI if never onboarded
 		cfg, err := config.LoadGlobal()
-		if err == nil && !cfg.OnboardingDone {
-			if err := showWelcome(true); err != nil {
+		cwd, _ := os.Getwd()
+		noProject := !config.ExistsProject(cwd)
+
+		// Show welcome when:
+		//   a) Global first-run (OnboardingDone == false), OR
+		//   b) Running in a folder without .odins (per-project first-run)
+		if err == nil && (!cfg.OnboardingDone || noProject) {
+			firstRun := !cfg.OnboardingDone
+			if err := showWelcome(firstRun); err != nil {
 				return err
 			}
+			// After the per-project welcome, don't open TUI —
+			// user was guided to run odins up / odins init.
+			if noProject && !config.ExistsProject(cwd) {
+				return nil
+			}
 		}
+
 		return tui.Run()
 	},
 }
