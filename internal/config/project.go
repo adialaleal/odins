@@ -21,6 +21,7 @@ type ProjectInfo struct {
 	Name      string `toml:"name"`
 	Runtime   string `toml:"runtime,omitempty"`
 	Framework string `toml:"framework,omitempty"`
+	Domain    string `toml:"domain,omitempty"` // parent domain (e.g. "tatoh")
 }
 
 // ProjectConfig is the structure of a .odins file.

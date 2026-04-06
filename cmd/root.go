@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/adialaleal/odins/internal/config"
 	"github.com/adialaleal/odins/internal/tui"
 	"github.com/spf13/cobra"
 )
@@ -16,13 +17,22 @@ var rootCmd = &cobra.Command{
 Stop fighting with ports. Route your local projects to beautiful subdomains
 with automatic HTTPS. Works with Node.js, Go, Python, Docker, and more.
 
-  odins init           — one-time setup (DNS, proxy, HTTPS)
-  odins up             — read .odins config and apply routes
-  odins add <domain>   — add a single route
-  odins ls             — list active routes
-  odins kill <domain>  — remove a route
-  odins                — open the TUI dashboard`,
+  odins init              — one-time setup (DNS, proxy, HTTPS)
+  odins domain add tatoh  — criar workspace tatoh.odins
+  odins up                — read .odins config and apply routes
+  odins add <domain>      — add a single route
+  odins ls                — list active routes
+  odins kill <domain>     — remove a route
+  odins welcome           — guia de onboarding
+  odins                   — open the TUI dashboard`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// First-run detection: show welcome before TUI if never onboarded
+		cfg, err := config.LoadGlobal()
+		if err == nil && !cfg.OnboardingDone {
+			if err := showWelcome(true); err != nil {
+				return err
+			}
+		}
 		return tui.Run()
 	},
 }
@@ -49,5 +59,7 @@ func init() {
 		downCmd,
 		lsCmd,
 		killCmd,
+		domainCmd,
+		welcomeCmd,
 	)
 }
