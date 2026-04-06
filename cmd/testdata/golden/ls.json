@@ -1,0 +1,25 @@
+{
+  "command": "ls",
+  "data": {
+    "count": 1,
+    "routes": [
+      {
+        "proto": "HTTPS",
+        "route": {
+          "created_at": "2026-04-06T12:00:00Z",
+          "docker_container": "",
+          "https": true,
+          "id": "odins-api.rankly.odin",
+          "port": 1,
+          "project": "rankly",
+          "runtime": "node",
+          "subdomain": "api.rankly.odin"
+        },
+        "runtime": "node",
+        "up": false
+      }
+    ]
+  },
+  "ok": true,
+  "warnings": []
+}

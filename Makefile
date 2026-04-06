@@ -1,4 +1,4 @@
-.PHONY: build install tidy lint test clean
+.PHONY: build install tidy lint test clean ai-packs ai-check
 
 BINARY = odins
 VERSION ?= dev
@@ -17,6 +17,12 @@ lint:
 
 test:
 	go test -v -race ./...
+
+ai-packs:
+	go run ./tools/ai-pack-gen
+
+ai-check:
+	go run ./tools/ai-pack-gen --check
 
 clean:
 	rm -f $(BINARY)

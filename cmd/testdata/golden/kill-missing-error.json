@@ -1,0 +1,8 @@
+{
+  "command": "kill",
+  "error": {
+    "code": "configuration_error",
+    "message": "rota 'missing.rankly.odin' não encontrada"
+  },
+  "ok": false
+}

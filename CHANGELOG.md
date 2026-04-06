@@ -4,6 +4,15 @@ All notable changes to ODINS are documented here.
 
 ## [Unreleased]
 
+### Added
+- `odins detect` for read-only project inspection and `.odins` recommendation
+- `odins doctor` for local environment diagnostics
+- `--json` structured output for operational commands
+- `--non-interactive`, `--tld`, and `--backend` flags for `odins init`
+- AI-friendly docs under `docs/ai/`
+- Published adapters for Codex, Claude Code, and Antigravity
+- Detection fixtures, JSON golden tests, and AI pack sync checks
+
 ## [0.1.0] - 2026-04-06
 
 ### Added

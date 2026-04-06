@@ -243,7 +243,8 @@ const htmlTemplate = `<!DOCTYPE html>
   {{if not .Routes}}
   <div class="empty">
     Nenhum serviço ainda.<br>
-    Adicione projetos com <code>odins up --domain {{.Domain}}</code>
+    Configure <code>domain = "{{.Domain}}"</code> no <code>.odins</code><br>
+    e depois rode <code>odins up</code>
   </div>
   {{else}}
   {{range .Routes}}

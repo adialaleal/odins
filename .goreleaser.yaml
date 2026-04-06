@@ -31,7 +31,11 @@ archives:
     files:
       - LICENSE
       - README.md
+      - AGENTS.md
+      - CLAUDE.md
       - .odins
+      - docs/ai/**
+      - ai/**
 
 brews:
   - name: odins

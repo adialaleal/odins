@@ -25,20 +25,20 @@ func runWelcome(cmd *cobra.Command, args []string) error {
 // If firstRun is true it offers to run `odins init` right after.
 func showWelcome(firstRun bool) error {
 	violet := "\033[38;5;141m"
-	dim    := "\033[38;5;245m"
-	bold   := "\033[1m"
-	reset  := "\033[0m"
-	green  := "\033[38;5;114m"
+	dim := "\033[38;5;245m"
+	bold := "\033[1m"
+	reset := "\033[0m"
+	green := "\033[38;5;114m"
 
 	clear()
 
 	fmt.Println()
 	fmt.Println(violet + bold + `   ██████╗ ██████╗ ██╗███╗   ██╗███████╗` + reset)
-	fmt.Println(violet +         `  ██╔═══██╗██╔══██╗██║████╗  ██║██╔════╝` + reset)
-	fmt.Println(violet +         `  ██║   ██║██║  ██║██║██╔██╗ ██║███████╗` + reset)
-	fmt.Println(violet +         `  ██║   ██║██║  ██║██║██║╚██╗██║╚════██║` + reset)
-	fmt.Println(violet +         `  ╚██████╔╝██████╔╝██║██║ ╚████║███████║` + reset)
-	fmt.Println(violet +         `   ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝╚══════╝` + reset)
+	fmt.Println(violet + `  ██╔═══██╗██╔══██╗██║████╗  ██║██╔════╝` + reset)
+	fmt.Println(violet + `  ██║   ██║██║  ██║██║██╔██╗ ██║███████╗` + reset)
+	fmt.Println(violet + `  ██║   ██║██║  ██║██║██║╚██╗██║╚════██║` + reset)
+	fmt.Println(violet + `  ╚██████╔╝██████╔╝██║██║ ╚████║███████║` + reset)
+	fmt.Println(violet + `   ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝╚══════╝` + reset)
 	fmt.Println()
 	fmt.Println(dim + "  ᚦ ᚢ ᚱ ᛋ ᛏ ᚨ ᛉ ᚾ   The All-Father of Local DNS" + reset)
 	fmt.Println()
@@ -107,14 +107,14 @@ func showWelcome(firstRun bool) error {
 	// ── Comandos ─────────────────────────────────────────────────────
 	section("Comandos Principais")
 	fmt.Println()
-	printCmd("odins init",             "Setup único: DNS, proxy, HTTPS")
+	printCmd("odins init", "Setup único: DNS, proxy, HTTPS")
 	printCmd("odins domain add tatoh", "Criar workspace tatoh.odins")
-	printCmd("odins up",               "Ativar rotas do projeto atual")
-	printCmd("odins ls",               "Listar rotas ativas")
-	printCmd("odins kill <fqdn>",      "Remover uma rota")
-	printCmd("odins down",             "Remover todas as rotas do projeto")
-	printCmd("odins",                  "Abrir painel TUI")
-	printCmd("odins welcome",          "Ver este guia novamente")
+	printCmd("odins up", "Ativar rotas do projeto atual")
+	printCmd("odins ls", "Listar rotas ativas")
+	printCmd("odins kill <fqdn>", "Remover uma rota")
+	printCmd("odins down", "Remover todas as rotas do projeto")
+	printCmd("odins", "Abrir painel TUI")
+	printCmd("odins welcome", "Ver este guia novamente")
 	fmt.Println()
 	pause()
 
@@ -156,24 +156,28 @@ func showWelcome(firstRun bool) error {
 }
 
 func section(title string) {
-	bold  := "\033[1m"
+	bold := "\033[1m"
 	violet := "\033[38;5;141m"
-	reset  := "\033[0m"
-	dim    := "\033[38;5;245m"
-	line   := strings.Repeat("─", 50)
+	reset := "\033[0m"
+	dim := "\033[38;5;245m"
+	line := strings.Repeat("─", 50)
 	fmt.Println(violet + bold + "  " + title + reset)
 	fmt.Println(dim + "  " + line + reset)
 }
 
 func printCmd(cmd, desc string) {
-	bold  := "\033[1m"
-	dim   := "\033[38;5;245m"
+	bold := "\033[1m"
+	dim := "\033[38;5;245m"
 	reset := "\033[0m"
 	fmt.Printf("  %-32s %s%s%s\n", bold+cmd+reset, dim, desc, reset)
 }
 
 func pause() {
-	dim   := "\033[38;5;245m"
+	if !isInteractiveIO() {
+		fmt.Println()
+		return
+	}
+	dim := "\033[38;5;245m"
 	reset := "\033[0m"
 	fmt.Print(dim + "  [Enter para continuar...]" + reset)
 	bufio.NewReader(os.Stdin).ReadString('\n')
