@@ -10,14 +10,14 @@ import (
 
 var domainCmd = &cobra.Command{
 	Use:   "domain",
-	Short: "Gerenciar domínios locais (workspaces de projeto)",
-	Long: `Cria e gerencia domínios locais. Um domínio é um workspace que agrupa serviços.
+	Short: "Manage local domains (project workspaces)",
+	Long: `Create and manage local domains. A domain is a workspace that groups services.
 
-Exemplo:
-  odins domain add tatoh                  # cria tatoh.odins (landing page)
-  odins domain add tatoh --title "Tatoh"  # com título personalizado
-  odins domain ls                          # lista todos os domínios
-  odins domain rm tatoh                    # remove domínio e seus serviços`,
+Example:
+  odins domain add myproject                  # creates myproject.odins (landing page)
+  odins domain add myproject --title "MyApp"  # with custom title
+  odins domain ls                              # list all domains
+  odins domain rm myproject                    # remove domain and its services`,
 }
 
 var (
@@ -27,8 +27,8 @@ var (
 
 func init() {
 	domainCmd.AddCommand(domainAddCmd, domainLsCmd, domainRmCmd)
-	domainAddCmd.Flags().StringVar(&domainTitle, "title", "", "Título exibido na landing page")
-	domainAddCmd.Flags().StringVar(&domainDesc, "desc", "", "Descrição do domínio")
+	domainAddCmd.Flags().StringVar(&domainTitle, "title", "", "Title displayed on the landing page")
+	domainAddCmd.Flags().StringVar(&domainDesc, "desc", "", "Domain description")
 }
 
 var domainAddCmd = &cobra.Command{
@@ -67,7 +67,7 @@ func runDomainAdd(cmd *cobra.Command, args []string) error {
 
 var domainLsCmd = &cobra.Command{
 	Use:   "ls",
-	Short: "Listar domínios cadastrados",
+	Short: "List registered domains",
 	RunE:  runDomainLs,
 }
 

@@ -2,6 +2,7 @@ package service
 
 import (
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/adialaleal/odins/internal/cert"
@@ -25,6 +26,7 @@ type Runtime struct {
 	GenerateDNSConfig    func([]string, int) error
 	LinkDNSConfig        func() error
 	SudoWriteResolver    func(string, int) error
+	SudoFlushDNS         func()
 	SudoTrustCA          func(string) error
 	CaddyCAPath          func() string
 	InstallMkcertCA      func() error
@@ -32,6 +34,7 @@ type Runtime struct {
 	FileExists           func(string) bool
 	ReadFile             func(string) ([]byte, error)
 	Sleep                func(time.Duration)
+	CaddyEnsureConfig    func() error
 	CaddyInit            func(string) error
 	CaddyIsRunning       func() bool
 	CaddyAddRoute        func(state.Route) error
@@ -63,6 +66,7 @@ func DefaultRuntime() Runtime {
 		GenerateDNSConfig:    dns.GenerateConfig,
 		LinkDNSConfig:        dns.LinkConfig,
 		SudoWriteResolver:    helper.SudoWriteResolver,
+		SudoFlushDNS:         helper.SudoFlushDNS,
 		SudoTrustCA:          helper.SudoTrustCA,
 		CaddyCAPath:          cert.CaddyCAPath,
 		InstallMkcertCA:      cert.InstallMkcertCA,
@@ -73,6 +77,7 @@ func DefaultRuntime() Runtime {
 		},
 		ReadFile:          os.ReadFile,
 		Sleep:             time.Sleep,
+		CaddyEnsureConfig: ensureCaddyfile,
 		CaddyInit:         caddyClient.Init,
 		CaddyIsRunning:    caddyClient.IsRunning,
 		CaddyAddRoute:     caddyClient.AddRoute,
@@ -97,4 +102,23 @@ type Manager struct {
 // New creates a service manager.
 func New(rt Runtime) *Manager {
 	return &Manager{rt: rt}
+}
+
+func ensureCaddyfile() error {
+	candidates := []string{
+		"/opt/homebrew/etc/Caddyfile",
+		"/usr/local/etc/Caddyfile",
+	}
+
+	for _, path := range candidates {
+		if _, err := os.Stat(filepath.Dir(path)); err == nil {
+			if _, err := os.Stat(path); os.IsNotExist(err) {
+				content := "{\n\tadmin localhost:2019\n}\n"
+				return os.WriteFile(path, []byte(content), 0o644)
+			}
+			return nil
+		}
+	}
+
+	return nil
 }

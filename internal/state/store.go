@@ -22,7 +22,7 @@ type Route struct {
 	CreatedAt       time.Time `json:"created_at"`
 }
 
-// Domain represents a local domain workspace (e.g. "tatoh" → tatoh.odins).
+// Domain represents a local domain workspace (e.g. "tatoh" → project.odins).
 type Domain struct {
 	Name        string    `json:"name"`
 	Title       string    `json:"title"`

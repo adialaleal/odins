@@ -73,7 +73,7 @@ func (m *Manager) Init(opts InitOptions) (InitResult, []string, error) {
 	if err := m.rt.BrewInstall("dnsmasq"); err != nil {
 		return InitResult{}, nil, runtimeFailure(err, "não foi possível instalar dnsmasq")
 	}
-	if err := m.rt.GenerateDNSConfig([]string{resolved.TLD}, 5353); err != nil {
+	if err := m.rt.GenerateDNSConfig([]string{resolved.TLD}, 5300); err != nil {
 		return InitResult{}, nil, runtimeFailure(err, "não foi possível gerar a configuração do dnsmasq")
 	}
 	if err := m.rt.LinkDNSConfig(); err != nil {
@@ -97,20 +97,40 @@ func (m *Manager) Init(opts InitOptions) (InitResult, []string, error) {
 	if err := m.rt.BrewInstall(proxyFormula); err != nil {
 		return InitResult{}, nil, runtimeFailure(err, "não foi possível instalar %s", proxyFormula)
 	}
-	if err := m.rt.BrewServiceStart(proxyFormula); err != nil {
+	if config.ProxyBackend(resolved.Backend) == config.BackendCaddy && m.rt.CaddyEnsureConfig != nil {
+		if err := m.rt.CaddyEnsureConfig(); err != nil {
+			warnings = append(warnings, "Não foi possível preparar o Caddyfile base: "+err.Error())
+			result.Steps = append(result.Steps, InitStep{Name: "caddyfile", OK: false, Warning: err.Error()})
+		} else {
+			result.Steps = append(result.Steps, InitStep{Name: "caddyfile", OK: true, Detail: "Caddyfile base preparado"})
+		}
+	}
+	if err := m.rt.BrewServiceRestart(proxyFormula); err != nil {
 		warnings = append(warnings, "Não foi possível iniciar o serviço "+proxyFormula+": "+err.Error())
 		result.Steps = append(result.Steps, InitStep{Name: "proxy-service", OK: false, Warning: err.Error()})
 	} else {
-		result.Steps = append(result.Steps, InitStep{Name: "proxy-service", OK: true, Detail: "Serviço " + proxyFormula + " iniciado"})
+		result.Steps = append(result.Steps, InitStep{Name: "proxy-service", OK: true, Detail: "Serviço " + proxyFormula + " reiniciado"})
+	}
+	if config.ProxyBackend(resolved.Backend) == config.BackendCaddy {
+		m.waitForCaddyAPI()
 	}
 
-	if err := m.rt.SudoWriteResolver(resolved.TLD, 5353); err != nil {
+	if err := m.rt.SudoWriteResolver(resolved.TLD, 5300); err != nil {
 		return InitResult{}, nil, runtimeFailure(err, "não foi possível escrever /etc/resolver/%s", resolved.TLD)
+	}
+	if m.rt.SudoFlushDNS != nil {
+		m.rt.SudoFlushDNS()
 	}
 	result.Steps = append(result.Steps, InitStep{Name: "resolver", OK: true, Detail: "/etc/resolver/" + resolved.TLD + " configurado"})
 
 	switch config.ProxyBackend(resolved.Backend) {
 	case config.BackendCaddy:
+		if err := m.rt.CaddyInit(resolved.TLD); err != nil {
+			warnings = append(warnings, "Não foi possível inicializar a configuração base do Caddy: "+err.Error())
+			result.Steps = append(result.Steps, InitStep{Name: "caddy-config", OK: false, Warning: err.Error()})
+		} else {
+			result.Steps = append(result.Steps, InitStep{Name: "caddy-config", OK: true, Detail: "Configuração base do Caddy carregada"})
+		}
 		m.waitForCaddyCA()
 		caPath := m.rt.CaddyCAPath()
 		if caPath == "" {
@@ -123,12 +143,6 @@ func (m *Manager) Init(opts InitOptions) (InitResult, []string, error) {
 			} else {
 				result.Steps = append(result.Steps, InitStep{Name: "certificates", OK: true, Detail: "CA local do Caddy adicionada ao keychain do macOS"})
 			}
-		}
-		if err := m.rt.CaddyInit(resolved.TLD); err != nil {
-			warnings = append(warnings, "Não foi possível inicializar a configuração base do Caddy: "+err.Error())
-			result.Steps = append(result.Steps, InitStep{Name: "caddy-config", OK: false, Warning: err.Error()})
-		} else {
-			result.Steps = append(result.Steps, InitStep{Name: "caddy-config", OK: true, Detail: "Configuração base do Caddy carregada"})
 		}
 	default:
 		if !m.rt.BrewFormulaInstalled("mkcert") {
@@ -153,12 +167,13 @@ func (m *Manager) Init(opts InitOptions) (InitResult, []string, error) {
 	}
 
 	result.Config = config.GlobalConfig{
-		TLD:          resolved.TLD,
-		ProxyBackend: config.ProxyBackend(resolved.Backend),
-		DnsmasqPort:  5353,
-		CaddyAdmin:   "http://localhost:2019",
-		HTTPPort:     80,
-		HTTPSPort:    443,
+		TLD:            resolved.TLD,
+		ProxyBackend:   config.ProxyBackend(resolved.Backend),
+		DnsmasqPort:    5300,
+		CaddyAdmin:     "http://localhost:2019",
+		HTTPPort:       80,
+		HTTPSPort:      443,
+		OnboardingDone: true,
 	}
 	if err := config.SaveGlobal(result.Config); err != nil {
 		return InitResult{}, nil, runtimeFailure(err, "não foi possível salvar a configuração global")
@@ -171,6 +186,15 @@ func (m *Manager) Init(opts InitOptions) (InitResult, []string, error) {
 func (m *Manager) waitForCaddyCA() {
 	for i := 0; i < 20; i++ {
 		if m.rt.CaddyCAPath() != "" {
+			return
+		}
+		m.rt.Sleep(500 * time.Millisecond)
+	}
+}
+
+func (m *Manager) waitForCaddyAPI() {
+	for i := 0; i < 20; i++ {
+		if m.rt.CaddyIsRunning != nil && m.rt.CaddyIsRunning() {
 			return
 		}
 		m.rt.Sleep(500 * time.Millisecond)

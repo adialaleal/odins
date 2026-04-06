@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/adialaleal/odins/internal/service"
+	"github.com/spf13/cobra"
 )
 
 var outputJSON bool
@@ -112,6 +113,13 @@ func renderJSONMaybe(cmdName string, out io.Writer, data any, warnings []string)
 		return nil
 	}
 	return writeJSONSuccess(out, cmdName, data, warnings)
+}
+
+func commandWriter(cmd *cobra.Command) io.Writer {
+	if cmd == nil {
+		return os.Stdout
+	}
+	return cmd.OutOrStdout()
 }
 
 func writeTextLine(w io.Writer, format string, args ...any) {

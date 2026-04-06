@@ -97,13 +97,13 @@ func (b *Backend) AddRoute(r state.Route) error {
 		return err
 	}
 
-	// Try to append to existing srv0.
-	if err := b.post("/config/apps/http/servers/srv0/routes/...", data); err != nil {
+	// Try to append to existing srv0 routes array.
+	if err := b.post("/config/apps/http/servers/srv0/routes", data); err != nil {
 		// srv0 likely doesn't exist — bootstrap a base config and retry.
 		if initErr := b.initBase(); initErr != nil {
 			return fmt.Errorf("caddy init base: %w (original: %v)", initErr, err)
 		}
-		return b.post("/config/apps/http/servers/srv0/routes/...", data)
+		return b.post("/config/apps/http/servers/srv0/routes", data)
 	}
 	return nil
 }
@@ -145,11 +145,11 @@ func (b *Backend) AddDomain(hostname, pageDir string) error {
 	if err != nil {
 		return err
 	}
-	if err := b.post("/config/apps/http/servers/srv0/routes/...", data); err != nil {
+	if err := b.post("/config/apps/http/servers/srv0/routes", data); err != nil {
 		if initErr := b.initBase(); initErr != nil {
 			return fmt.Errorf("caddy init base: %w (original: %v)", initErr, err)
 		}
-		return b.post("/config/apps/http/servers/srv0/routes/...", data)
+		return b.post("/config/apps/http/servers/srv0/routes", data)
 	}
 	return nil
 }
@@ -177,6 +177,43 @@ func (b *Backend) RemoveDomain(hostname string) error {
 func (b *Backend) Reload() error {
 	// Caddy API changes are applied instantly; reload is a no-op here.
 	return nil
+}
+
+// SyncRoutes rebuilds the entire Caddy config from the provided routes and
+// domain page directories. Call this after Caddy restarts to restore state.
+// domainPages maps domain name → landing page directory path.
+func (b *Backend) SyncRoutes(routes []state.Route, domainPages map[string]string) error {
+	allRoutes := make([]interface{}, 0, len(routes)+len(domainPages))
+
+	// Domain landing page routes first (lower priority than service routes)
+	for domain, pageDir := range domainPages {
+		allRoutes = append(allRoutes, buildDomainRoute(domain, pageDir))
+	}
+	// Service reverse-proxy routes
+	for _, r := range routes {
+		upstream := fmt.Sprintf("localhost:%d", r.Port)
+		if r.DockerContainer != "" {
+			upstream = fmt.Sprintf("%s:%d", r.DockerContainer, r.Port)
+		}
+		id := r.ID
+		if id == "" {
+			id = "odins-" + r.Subdomain
+		}
+		allRoutes = append(allRoutes, buildRoute(r.Subdomain, upstream, id))
+	}
+
+	cfg := buildBaseConfig("")
+	apps := cfg["apps"].(map[string]interface{})
+	http := apps["http"].(map[string]interface{})
+	servers := http["servers"].(map[string]interface{})
+	srv0 := servers["srv0"].(map[string]interface{})
+	srv0["routes"] = allRoutes
+
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return b.post("/load", data)
 }
 
 func (b *Backend) post(path string, data []byte) error {

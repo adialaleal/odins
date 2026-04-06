@@ -16,10 +16,13 @@ var initCmd = &cobra.Command{
 	Long: `odins init configures your Mac for local domain routing.
 
 It will:
-  1. Install dnsmasq and a reverse proxy via Homebrew
-  2. Configure DNS wildcard resolution
-  3. Set up HTTPS with a trusted local certificate
-  4. Save the ODINS global config`,
+  1. Install dnsmasq, caddy (or nginx/apache) via Homebrew
+  2. Ask which TLD and proxy backend you want
+  3. Configure DNS wildcard resolution (one sudo prompt)
+  4. Set up HTTPS with a trusted local certificate
+  5. Start all services
+
+Run again at any time to repair or reconfigure.`,
 	RunE: runInit,
 }
 
@@ -36,6 +39,7 @@ func init() {
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
+	out := commandWriter(cmd)
 	selectedTLD := strings.TrimSpace(initTLD)
 	selectedBackend := strings.TrimSpace(initBackend)
 
@@ -59,33 +63,33 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	if outputJSON {
-		return writeJSONSuccess(cmd.OutOrStdout(), "init", result, warnings)
+		return writeJSONSuccess(out, "init", result, warnings)
 	}
 
-	writeTextLine(cmd.OutOrStdout(), "")
-	writeTextLine(cmd.OutOrStdout(), "  ✓ ODINS configurado com sucesso!")
-	writeTextLine(cmd.OutOrStdout(), "  → TLD: .%s", result.TLD)
-	writeTextLine(cmd.OutOrStdout(), "  → Proxy: %s", result.Backend)
+	writeTextLine(out, "")
+	writeTextLine(out, "  ✓ ODINS configurado com sucesso!")
+	writeTextLine(out, "  → TLD: .%s", result.TLD)
+	writeTextLine(out, "  → Proxy: %s", result.Backend)
 	for _, step := range result.Steps {
 		if step.OK {
-			writeTextLine(cmd.OutOrStdout(), "  ✓ %s: %s", step.Name, step.Detail)
+			writeTextLine(out, "  ✓ %s: %s", step.Name, step.Detail)
 			continue
 		}
 		if step.Warning != "" {
-			writeTextLine(cmd.OutOrStdout(), "  ⚠  %s: %s", step.Name, step.Warning)
+			writeTextLine(out, "  ⚠  %s: %s", step.Name, step.Warning)
 		}
 	}
 	for _, warning := range warnings {
-		writeTextLine(cmd.OutOrStdout(), "  ⚠  %s", warning)
+		writeTextLine(out, "  ⚠  %s", warning)
 	}
-	writeTextLine(cmd.OutOrStdout(), "")
-	writeTextLine(cmd.OutOrStdout(), "  Domínios disponíveis: https://<projeto>.%s", result.TLD)
-	writeTextLine(cmd.OutOrStdout(), "")
-	writeTextLine(cmd.OutOrStdout(), "  Próximos passos:")
-	writeTextLine(cmd.OutOrStdout(), "    cd meu-projeto && odins detect --json")
-	writeTextLine(cmd.OutOrStdout(), "    cd meu-projeto && odins up")
-	writeTextLine(cmd.OutOrStdout(), "    odins doctor")
-	writeTextLine(cmd.OutOrStdout(), "")
+	writeTextLine(out, "")
+	writeTextLine(out, "  Domínios disponíveis: https://<projeto>.%s", result.TLD)
+	writeTextLine(out, "")
+	writeTextLine(out, "  Próximos passos:")
+	writeTextLine(out, "    cd meu-projeto && odins detect --json")
+	writeTextLine(out, "    cd meu-projeto && odins up")
+	writeTextLine(out, "    odins doctor")
+	writeTextLine(out, "")
 	return nil
 }
 

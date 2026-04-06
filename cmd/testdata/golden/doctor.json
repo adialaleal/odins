@@ -81,7 +81,7 @@
     ],
     "config": {
       "caddy_admin": "http://localhost:2019",
-      "dnsmasq_port": 5353,
+      "dnsmasq_port": 5300,
       "http_port": 80,
       "https_port": 443,
       "onboarding_done": false,

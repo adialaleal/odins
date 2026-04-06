@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/adialaleal/odins/internal/detect"
+	"github.com/adialaleal/odins/internal/i18n"
 	"github.com/adialaleal/odins/internal/state"
 	"github.com/adialaleal/odins/internal/tui/components"
 	"github.com/adialaleal/odins/internal/tui/styles"
@@ -121,9 +122,14 @@ func (m AddRouteModel) Update(msg tea.Msg) (AddRouteModel, tea.Cmd) {
 
 // View renders the add-route form.
 func (m AddRouteModel) View() string {
-	titleBar := components.TitleBar(m.width, "Adicionar Rota", "")
+	titleBar := components.TitleBar(m.width, i18n.T("add.title"), "")
 
-	labels := []string{"Subdomínio", "Porta", "Projeto", "Docker"}
+	labels := []string{
+		i18n.T("add.field.subdomain"),
+		i18n.T("add.field.port"),
+		i18n.T("add.field.project"),
+		i18n.T("add.field.docker"),
+	}
 	fields := make([]string, fieldCount)
 
 	for i, inp := range m.inputs {
@@ -143,7 +149,7 @@ func (m AddRouteModel) View() string {
 	var detectionInfo string
 	if m.detected != nil && m.detected.Runtime != "unknown" {
 		detectionInfo = styles.StatusInfo.Render(
-			fmt.Sprintf("  ✦ Detectado: %s/%s (porta %d)",
+			"  " + i18n.Tf("add.detected",
 				m.detected.Runtime, m.detected.Framework, m.detected.Port),
 		)
 	}
@@ -154,9 +160,9 @@ func (m AddRouteModel) View() string {
 	}
 
 	hints := []components.KeyHint{
-		{Key: "Tab", Desc: "próximo campo"},
-		{Key: "Enter", Desc: "confirmar"},
-		{Key: "Esc", Desc: "cancelar"},
+		{Key: "Tab", Desc: i18n.T("hint.next_field")},
+		{Key: "Enter", Desc: i18n.T("hint.confirm")},
+		{Key: "Esc", Desc: i18n.T("hint.cancel")},
 	}
 	footer := components.Footer(m.width, hints)
 
@@ -195,14 +201,14 @@ func (m AddRouteModel) validate() (state.Route, error) {
 	docker := strings.TrimSpace(m.inputs[fieldDocker].Value())
 
 	if subdomain == "" {
-		return state.Route{}, fmt.Errorf("subdomínio é obrigatório")
+		return state.Route{}, fmt.Errorf("%s", i18n.T("add.err.subdomain"))
 	}
 	if portStr == "" {
-		return state.Route{}, fmt.Errorf("porta é obrigatória")
+		return state.Route{}, fmt.Errorf("%s", i18n.T("add.err.port_required"))
 	}
 	port, err := strconv.Atoi(portStr)
 	if err != nil || port < 1 || port > 65535 {
-		return state.Route{}, fmt.Errorf("porta inválida")
+		return state.Route{}, fmt.Errorf("%s", i18n.T("add.err.port_invalid"))
 	}
 
 	return state.Route{
