@@ -26,11 +26,28 @@ builds:
 archives:
   - id: odins-archive
     name_template: "odins_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    format: tar.gz
+    formats:
+      - tar.gz
     files:
       - LICENSE
       - README.md
       - .odins
+
+brews:
+  - name: odins
+    repository:
+      owner: adialaleal
+      name: homebrew-odins
+      branch: main
+      token: "{{ .Env.GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/adialaleal/odins"
+    description: "The All-Father of Local DNS — Local DNS + Reverse Proxy manager for macOS"
+    license: "MIT"
+    install: |
+      bin.install "odins"
+    test: |
+      assert_match "ODINS", shell_output("#{bin}/odins --help")
 
 checksum:
   name_template: "checksums.txt"
