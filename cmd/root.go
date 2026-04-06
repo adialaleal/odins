@@ -27,6 +27,12 @@ with automatic HTTPS. Works with Node.js, Go, Python, Docker, and more.
 	},
 }
 
+// SetVersion wires version info injected by GoReleaser into the Cobra root command.
+// Cobra automatically adds --version / -v when Version is non-empty.
+func SetVersion(v, c, d string) {
+	rootCmd.Version = fmt.Sprintf("%s (commit: %s, built: %s)", v, c, d)
+}
+
 // Execute is the entry point called from main.go.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
