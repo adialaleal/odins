@@ -1,0 +1,61 @@
+version: 2
+
+project_name: odins
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: odins
+    main: .
+    binary: odins
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - id: odins-archive
+    name_template: "odins_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format: tar.gz
+    files:
+      - LICENSE
+      - README.md
+      - .odins
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "Merge pull request"
+      - "Merge branch"
+
+release:
+  github:
+    owner: adialaleal
+    name: odins
+  draft: false
+  prerelease: auto
+  name_template: "ODINS v{{.Version}}"
+  header: |
+    ## ODINS v{{.Version}} — The All-Father of Local DNS
+
+    Install:
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/adialaleal/odins/main/install.sh | bash
+    ```

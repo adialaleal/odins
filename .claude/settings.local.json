@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go mod:*)",
+      "Bash(/usr/local/go/bin/go mod:*)",
+      "Read(//usr/local/go/**)",
+      "Read(//opt/homebrew/Cellar/go/1.24.2/libexec/bin/**)",
+      "Read(//Users/adiala/go/bin/**)",
+      "Bash(/opt/homebrew/bin/go mod:*)",
+      "Bash(/opt/homebrew/bin/go build:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}

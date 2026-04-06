@@ -1,0 +1,25 @@
+# .odins — ODINS project config
+# Place this file in your project root.
+# Run: odins up
+
+[project]
+name = "rankly"
+runtime = "node"       # auto-detected: node | go | python
+framework = "nextjs"   # auto-detected: nextjs | gin | fastapi | etc.
+
+[[routes]]
+subdomain = "app"      # becomes: app.rankly.<tld>
+port = 3000
+https = true
+
+[[routes]]
+subdomain = "api"
+port = 4000
+https = true
+
+# Docker example:
+# [[routes]]
+# subdomain = "worker"
+# port = 5000
+# docker_container = "rankly_worker_1"
+# https = true
