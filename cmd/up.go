@@ -106,6 +106,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 		fqdn := buildFQDN(rc.Subdomain, projCfg.Project.Name, cfg.TLD)
 
 		r := state.Route{
+			ID:              "odins-" + fqdn,
 			Subdomain:       fqdn,
 			Port:            rc.Port,
 			Project:         projCfg.Project.Name,

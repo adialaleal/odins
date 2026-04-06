@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -78,18 +79,43 @@ func (b *Backend) Init(tld string) error {
 }
 
 // AddRoute adds a reverse proxy route via the Caddy Admin API.
+// If the server config doesn't exist yet (Caddy freshly started), it initialises
+// a base config with an empty srv0 first, then appends the route.
 func (b *Backend) AddRoute(r state.Route) error {
 	upstream := fmt.Sprintf("localhost:%d", r.Port)
 	if r.DockerContainer != "" {
 		upstream = fmt.Sprintf("%s:%d", r.DockerContainer, r.Port)
 	}
 
-	route := buildRoute(r.Subdomain, upstream, r.ID)
+	routeID := r.ID
+	if routeID == "" {
+		routeID = "odins-" + r.Subdomain
+	}
+	route := buildRoute(r.Subdomain, upstream, routeID)
 	data, err := json.Marshal(route)
 	if err != nil {
 		return err
 	}
-	return b.post("/config/apps/http/servers/srv0/routes/...", data)
+
+	// Try to append to existing srv0.
+	if err := b.post("/config/apps/http/servers/srv0/routes/...", data); err != nil {
+		// srv0 likely doesn't exist — bootstrap a base config and retry.
+		if initErr := b.initBase(); initErr != nil {
+			return fmt.Errorf("caddy init base: %w (original: %v)", initErr, err)
+		}
+		return b.post("/config/apps/http/servers/srv0/routes/...", data)
+	}
+	return nil
+}
+
+// initBase pushes a minimal Caddy config that creates srv0.
+func (b *Backend) initBase() error {
+	cfg := buildBaseConfig("")
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return b.post("/load", data)
 }
 
 // RemoveRoute removes a route by its ODINS ID.
@@ -141,8 +167,17 @@ func findBinary(name string) (string, error) {
 }
 
 func runBrewService(action, service string) error {
-	// Delegated to pkg/brew; import avoided to prevent cycle — use os/exec directly.
-	import_cmd := fmt.Sprintf("brew services %s %s", action, service)
-	_ = import_cmd
-	return nil
+	cmd := exec.Command(brewBin(), "services", action, service)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func brewBin() string {
+	for _, p := range []string{"/opt/homebrew/bin/brew", "/usr/local/bin/brew"} {
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return "brew"
 }
