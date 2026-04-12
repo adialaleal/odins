@@ -3,7 +3,10 @@ package docker
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
+	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -16,10 +19,10 @@ type Container struct {
 	IP    string
 }
 
-// IsRunning returns true if the Docker socket is accessible.
+// IsRunning returns true if the Docker daemon is accessible.
 func IsRunning() bool {
 	client := &http.Client{
-		Timeout: 2 * time.Second,
+		Timeout:   2 * time.Second,
 		Transport: &http.Transport{},
 	}
 	resp, err := client.Get("http://localhost:2375/_ping")
@@ -27,24 +30,33 @@ func IsRunning() bool {
 		resp.Body.Close()
 		return resp.StatusCode == 200
 	}
-	// Try unix socket via curl check
 	return dockerSocketExists()
 }
 
+// dockerSocketExists returns true if the Docker CLI can reach the daemon.
 func dockerSocketExists() bool {
-	// Check if docker CLI is available and daemon is reachable
-	import_cmd := "docker info"
-	_ = import_cmd
-	return false
+	return exec.Command("docker", "info").Run() == nil
 }
 
 // FindContainerPort looks up the host port mapped to a container's internal port.
-// Returns empty string if not found or Docker is unavailable.
+// Uses "docker port <container> <port>" and parses the output.
 func FindContainerPort(ctx context.Context, containerName string, internalPort int) (string, error) {
-	// Use docker CLI as a fallback since importing the Docker client adds significant dependencies
-	_ = containerName
-	_ = internalPort
-	return fmt.Sprintf("127.0.0.1:%d", internalPort), nil
+	out, err := exec.CommandContext(ctx, "docker", "port", containerName, fmt.Sprintf("%d", internalPort)).Output()
+	if err != nil {
+		// Docker not available or container not running — fall back to direct port
+		return fmt.Sprintf("127.0.0.1:%d", internalPort), nil
+	}
+	// Output format: "0.0.0.0:32768\n" or ":::32768\n"
+	line := strings.TrimSpace(strings.Split(string(out), "\n")[0])
+	if line == "" {
+		return fmt.Sprintf("127.0.0.1:%d", internalPort), nil
+	}
+	// Extract port from "0.0.0.0:PORT" or ":::PORT"
+	_, port, err := net.SplitHostPort(line)
+	if err != nil {
+		return fmt.Sprintf("127.0.0.1:%d", internalPort), nil
+	}
+	return "127.0.0.1:" + port, nil
 }
 
 // CheckUpstream performs an HTTP HEAD request to verify if an upstream is reachable.

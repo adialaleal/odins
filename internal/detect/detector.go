@@ -7,13 +7,14 @@ import (
 
 // DetectedProject contains auto-detected project information.
 type DetectedProject struct {
-	Name       string `json:"name"`
-	Runtime    string `json:"runtime"`   // "node", "go", "python", "unknown"
-	Framework  string `json:"framework"` // "nextjs", "gin", "fastapi", etc.
-	Port       int    `json:"port"`
-	StartCmd   string `json:"start_cmd"`
-	HasDocker  bool   `json:"has_docker"`
-	HasCompose bool   `json:"has_compose"`
+	Name            string           `json:"name"`
+	Runtime         string           `json:"runtime"`   // "node", "go", "python", "unknown"
+	Framework       string           `json:"framework"` // "nextjs", "gin", "fastapi", etc.
+	Port            int              `json:"port"`
+	StartCmd        string           `json:"start_cmd"`
+	HasDocker       bool             `json:"has_docker"`
+	HasCompose      bool             `json:"has_compose"`
+	ComposeServices []ComposeService `json:"compose_services,omitempty"`
 }
 
 // Project detects the project type and configuration in dir.
@@ -35,6 +36,9 @@ func Project(dir string) DetectedProject {
 	d.HasCompose = fileExists(filepath.Join(dir, "docker-compose.yml")) ||
 		fileExists(filepath.Join(dir, "docker-compose.yaml")) ||
 		fileExists(filepath.Join(dir, "compose.yml"))
+	if d.HasCompose {
+		d.ComposeServices = ParseComposeServices(dir)
+	}
 
 	if nd := detectNode(dir); nd != nil {
 		d.Runtime = "node"
