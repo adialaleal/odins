@@ -23,8 +23,7 @@ func (b *Backend) IsInstalled() bool {
 }
 
 func (b *Backend) IsRunning() bool {
-	out, _ := exec.Command("apachectl", "status").Output()
-	return len(out) > 0
+	return exec.Command("pgrep", "-x", "httpd").Run() == nil
 }
 
 func (b *Backend) Install() error { return nil }

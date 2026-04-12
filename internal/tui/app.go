@@ -430,7 +430,9 @@ func odinsUpCmd(cfg config.GlobalConfig, store *state.Store) tea.Cmd {
 				Project: config.ProjectInfo{Name: d.Name, Runtime: d.Runtime, Framework: d.Framework},
 				Routes:  routes,
 			}
-			_ = config.SaveProject(projectCfgPath, projCfg)
+			if err := config.SaveProject(projectCfgPath, projCfg); err != nil {
+				return UpDoneMsg{Err: fmt.Errorf("salvar .odins: %w", err)}
+			}
 		}
 
 		applied := 0
@@ -453,7 +455,9 @@ func odinsUpCmd(cfg config.GlobalConfig, store *state.Store) tea.Cmd {
 			store.Add(r)
 			applied++
 		}
-		_ = store.Save()
+		if err := store.Save(); err != nil {
+			return UpDoneMsg{Err: fmt.Errorf("salvar rotas: %w", err)}
+		}
 		return UpDoneMsg{Applied: applied}
 	}
 }
