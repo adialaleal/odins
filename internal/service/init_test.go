@@ -23,6 +23,7 @@ func TestInitNonInteractiveDefaults(t *testing.T) {
 		SudoTrustCA:          func(string) error { return nil },
 		CaddyCAPath:          func() string { return "/tmp/caddy/root.crt" },
 		InstallMkcertCA:      func() error { return nil },
+		IssueMkcert:          func(string) error { return nil },
 		ResolverPath:         func(string) string { return "/tmp/resolver/odin" },
 		FileExists:           func(string) bool { return true },
 		ReadFile:             func(string) ([]byte, error) { return nil, nil },

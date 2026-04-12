@@ -30,6 +30,7 @@ type Runtime struct {
 	SudoTrustCA          func(string) error
 	CaddyCAPath          func() string
 	InstallMkcertCA      func() error
+	IssueMkcert          func(string) error
 	ResolverPath         func(string) string
 	FileExists           func(string) bool
 	ReadFile             func(string) ([]byte, error)
@@ -70,6 +71,7 @@ func DefaultRuntime() Runtime {
 		SudoTrustCA:          helper.SudoTrustCA,
 		CaddyCAPath:          cert.CaddyCAPath,
 		InstallMkcertCA:      cert.InstallMkcertCA,
+		IssueMkcert:          cert.IssueMkcert,
 		ResolverPath:         dns.ResolverPath,
 		FileExists: func(path string) bool {
 			_, err := os.Stat(path)

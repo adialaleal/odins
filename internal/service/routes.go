@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/adialaleal/odins/internal/config"
@@ -521,8 +522,14 @@ func (m *Manager) DomainRemove(name string) (DomainRemoveResult, []string, error
 func (m *Manager) addProxyRoute(cfg config.GlobalConfig, route state.Route) error {
 	switch cfg.ProxyBackend {
 	case config.BackendNginx:
+		if err := m.rt.IssueMkcert(route.Subdomain); err != nil {
+			return fmt.Errorf("emitir certificado para %s: %w", route.Subdomain, err)
+		}
 		return m.rt.NginxAddRoute(route)
 	case config.BackendApache:
+		if err := m.rt.IssueMkcert(route.Subdomain); err != nil {
+			return fmt.Errorf("emitir certificado para %s: %w", route.Subdomain, err)
+		}
 		return m.rt.ApacheAddRoute(route)
 	default:
 		return m.rt.CaddyAddRoute(route)
