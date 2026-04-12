@@ -1,4 +1,4 @@
-# ODINS
+<div align="center">
 
 ```
   ____  ____  ___ _   _ ____
@@ -6,19 +6,37 @@
 | |  | | | | || ||  \| \___ \
 | |__| | |_| || || |\  |___) |
  \____/|____/|___|_| \_|____/
-
-  The All-Father of Local DNS
 ```
 
-**ODINS** is a local DNS + reverse proxy manager for macOS developers.
+**The All-Father of Local DNS**
 
-Stop fighting with ports. Route your local projects to memorable subdomains with automatic HTTPS — and never type `localhost:3000` again.
+[![CI](https://github.com/adialaleal/odins/actions/workflows/ci.yml/badge.svg)](https://github.com/adialaleal/odins/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/adialaleal/odins?color=7c3aed&label=latest)](https://github.com/adialaleal/odins/releases/latest)
+[![Go Version](https://img.shields.io/badge/go-1.22+-00ADD8?logo=go)](https://go.dev)
+[![License: MIT](https://img.shields.io/badge/license-MIT-6d28d9)](LICENSE)
+[![macOS](https://img.shields.io/badge/macOS-only-lightgrey?logo=apple)](https://www.apple.com/macos/)
+
+*Stop fighting with ports. Route your local projects to beautiful domains with automatic HTTPS.*
+
+[Install](#install) · [Quick Start](#quick-start) · [Commands](#commands) · [Contributing](#contributing)
+
+</div>
+
+---
+
+## What is ODINS?
+
+ODINS is a **local DNS + reverse proxy manager** for macOS developers.
+
+Instead of juggling `localhost:3000`, `localhost:5173`, `localhost:8080`... you get:
 
 ```
-https://api.rankly.odin   →  localhost:3000   (Node.js/Express)
-https://app.rankly.odin   →  localhost:5173   (Vite/React)
-https://api.rankly.odin   →  localhost:8080   (Go/Gin)
+https://api.rankly.odin   →  localhost:3000   (Node.js / Express)
+https://app.rankly.odin   →  localhost:5173   (Vite / React)
+https://jobs.rankly.odin  →  localhost:8080   (Go / Gin)
 ```
+
+Zero config. One command. Automatic HTTPS. Beautiful TUI dashboard.
 
 ---
 
@@ -28,121 +46,193 @@ https://api.rankly.odin   →  localhost:8080   (Go/Gin)
 curl -fsSL https://raw.githubusercontent.com/adialaleal/odins/main/install.sh | bash
 ```
 
-**Requirements:** macOS, [Homebrew](https://brew.sh)
+**Requirements:** macOS · [Homebrew](https://brew.sh)
+
+> **Homebrew tap** *(coming soon)*
+> ```bash
+> brew install adialaleal/odins/odins
+> ```
+
+---
+
+## AI Friendly
+
+ODINS agora expõe uma superfície oficial para agentes via `CLI + JSON + docs`.
+
+- Use `odins detect --json` para inspecionar um projeto sem alterar arquivos.
+- Use `odins doctor --json` para diagnosticar DNS, proxy, HTTPS e store.
+- Use `--json` nos comandos operacionais para saídas estáveis em automação.
+- Consulte [AGENTS.md](AGENTS.md), [CLAUDE.md](CLAUDE.md) e [`ai/`](ai/) para os adapters publicados.
+
+Documentação canônica:
+
+- [docs/ai/setup-local.md](docs/ai/setup-local.md)
+- [docs/ai/apply-to-project.md](docs/ai/apply-to-project.md)
+- [docs/ai/workspace-multi-service.md](docs/ai/workspace-multi-service.md)
+- [docs/ai/doctor-troubleshoot.md](docs/ai/doctor-troubleshoot.md)
 
 ---
 
 ## Quick Start
 
 ```bash
-# 1. One-time setup (installs dnsmasq + caddy, configures DNS and HTTPS)
+# 1. One-time setup — installs dnsmasq + Caddy, configures DNS and HTTPS
 odins init
 
-# 2. In any project directory
-cd ~/Projects/rankly/api
-odins up   # auto-detects Node.js/Go/Python and creates .odins
+# 2. Inspect any project first
+cd ~/Projects/my-api
+odins detect --json
 
-# 3. Open your browser
-open https://api.rankly.odin
+# 3. Apply routes in the project directory
+odins up
+#  → Detectado: node/vite (porta 5173)
+#  → ✓ https://my-api.my-api.odin → :5173
 
-# 4. Manage routes
+# 4. Validate routes and the local environment
 odins ls
-odins kill api.rankly.odin
+odins doctor
 
-# 5. TUI dashboard
+# 5. Open the TUI dashboard
 odins
 ```
 
 ---
 
-## TLD Options
+## TUI Dashboard
 
-Choose your preferred TLD during `odins init`. All are supported:
-
-| TLD | Notes |
-|-----|-------|
-| `.odin` | Thematic, no conflicts — **default** |
-| `.odins` | Thematic variant |
-| `.test` | IANA reserved for testing, no HSTS |
-| `.dev` | Popular, but requires HTTPS (Chrome HSTS) — Caddy handles it |
-| `.lan` | Common in local networks |
-| `.internal` | Enterprise-style |
-| `.local` | ⚠️ mDNS conflict on macOS — use with caution |
+```
+┌─ ODINS ─────────────────────────────── 4 rotas ─────────────────────────────┐
+│                                                                               │
+│  STATUS  SUBDOMAIN              PORT   PROTO  RUNTIME   PROJECT              │
+│  ──────  ─────────              ────   ─────  ───────   ───────              │
+│  ●       app.rankly.odin        3000   HTTPS  node      rankly               │
+│  ●       api.rankly.odin        4000   HTTPS  node      rankly               │
+│  ●       jobs.rankly.odin       8080   HTTPS  go        rankly               │
+│  ○       worker.rankly.odin     5000   HTTPS  docker    rankly               │
+│                                                                               │
+│  [a] adicionar  [u] odins up  [x] remover  [s] settings  [l] logs  [q] sair │
+└───────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## Commands
 
 | Command | Description |
-|---------|-------------|
+|---|---|
 | `odins` | Open TUI dashboard |
 | `odins init` | One-time setup: DNS, proxy, HTTPS |
+| `odins detect` | Inspect project runtime/framework/port and recommend a `.odins` |
 | `odins up` | Apply routes from `.odins` in current directory |
 | `odins down` | Remove all routes for current project |
-| `odins add <subdomain> --port <port>` | Add a single route |
-| `odins kill <subdomain>` | Remove a route |
+| `odins add <sub> --port <n>` | Add a single route |
+| `odins kill <subdomain>` | Remove a specific route |
 | `odins ls` | List all active routes |
+| `odins doctor` | Diagnose Homebrew, DNS, proxy, HTTPS and store health |
+| `odins domain add <name>` | Create a workspace domain landing page |
+| `odins domain ls` | List workspace domains |
+| `odins domain rm <name>` | Remove a workspace domain |
 
-### `odins add` flags
+### Machine-readable mode
+
+All operational commands support `--json`.
 
 ```bash
-odins add api.rankly.odin --port 3000
-odins add worker.rankly.odin --port 5000 --docker rankly_worker_1
-odins add admin.rankly.odin --port 8080 --no-https
+odins detect --json
+odins ls --json
+odins doctor --json
+odins init --json --non-interactive --tld odin --backend caddy
+```
+
+### Flags
+
+```bash
+# Route with Docker container
+odins add worker.rankly --port 5000 --docker rankly_worker_1
+
+# HTTP only (no HTTPS)
+odins add admin.rankly --port 8080 --no-https
+
+# Use global ~/.odins config
+odins up --global
+
+# Use a specific directory
+odins up --dir ~/Projects/my-api
 ```
 
 ---
 
 ## `.odins` Project Config
 
-Place a `.odins` file in your project root:
+Place a `.odins` file in your project root — or let `odins up` generate one automatically:
 
 ```toml
 [project]
-name = "rankly"
-runtime = "node"       # auto-detected
-framework = "nextjs"   # auto-detected
+name      = "rankly"
+runtime   = "node"       # auto-detected: node | go | python
+framework = "nextjs"     # auto-detected
+domain    = "rankly"     # → routes become sub.rankly.<tld>
 
 [[routes]]
-subdomain = "app"      # → app.rankly.<tld>
-port = 3000
-https = true
+subdomain = "app"        # → app.rankly.odin
+port      = 3000
+https     = true
 
 [[routes]]
-subdomain = "api"
-port = 4000
-https = true
+subdomain = "api"        # → api.rankly.odin
+port      = 4000
+https     = true
 
-# Docker support
 [[routes]]
-subdomain = "worker"
-port = 5000
+subdomain = "worker"     # Docker container
+port      = 5000
 docker_container = "rankly_worker_1"
-https = true
+https     = true
 ```
-
-Then run `odins up` from any directory in your project.
 
 ---
 
-## Project Detection
+## Prompt Recipes
 
-When no `.odins` exists, `odins up` auto-detects your project:
+Copy and paste one of these prompts into your AI coding tool:
 
-### Node.js
-- Detects via `package.json`
-- Frameworks: **Next.js**, **Nuxt**, **Vite**, **Express**, **Fastify**, **NestJS**, **Remix**, **Hapi**, **Koa**
-- Port: reads `PORT` from `.env`, `.env.local`, `.env.development`
+### Detect a project
 
-### Go
-- Detects via `go.mod`
-- Frameworks: **Gin** (8080), **Echo** (1323), **Fiber** (3000), **Chi** (8080), **Gorilla** (8080)
-- Port: scans `main.go` for `ListenAndServe`, `:Listen`, `:Run`
+```text
+Explore este repositório primeiro. Depois rode `odins detect --json` na raiz do projeto, resuma runtime/framework/porta detectados e proponha o `.odins` recomendado sem aplicar mudanças ainda.
+```
 
-### Python
-- Detects via `manage.py`, `pyproject.toml`, `requirements.txt`
-- Frameworks: **Django** (8000), **FastAPI** (8000), **Flask** (5000), **Sanic** (8000), **Tornado** (8888)
-- Port: reads `PORT` from `.env`
+### Propose and apply `.odins`
+
+```text
+Explore este projeto, rode `odins detect --json`, proponha o `.odins` ideal e só depois aplique com `odins up`. Se houver qualquer ação com sudo, me avise antes.
+```
+
+### Connect to a workspace domain
+
+```text
+Explore o projeto, sugira como conectá-lo a um workspace ODINS existente ou novo usando `odins domain add` e o campo `domain` no `.odins`. Prefira `odins detect --json` antes de qualquer mudança.
+```
+
+### Validate the environment
+
+```text
+Rode `odins doctor --json`, explique cada check com problema e proponha a próxima ação mínima para deixar o ambiente saudável.
+```
+
+---
+
+## Project Auto-Detection
+
+`odins up` detects your stack automatically — no config needed:
+
+| Runtime | Detected via | Frameworks |
+|---|---|---|
+| **Node.js** | `package.json` | Next.js, Nuxt, Vite, Express, Fastify, NestJS, Remix, Hapi, Koa |
+| **Go** | `go.mod` | Gin, Echo, Fiber, Chi, Gorilla |
+| **Python** | `requirements.txt`, `pyproject.toml`, `manage.py` | FastAPI, Django, Flask, Sanic, Tornado |
+
+Port is read from `.env` / `.env.local` / `.env.development` when present.
 
 ---
 
@@ -151,34 +241,42 @@ When no `.odins` exists, `odins up` auto-detects your project:
 Choose during `odins init`:
 
 | Backend | Notes |
-|---------|-------|
-| **Caddy** *(recommended)* | Auto HTTPS via internal TLS, hot-reload via Admin API |
-| **Nginx** | Familiar config, uses mkcert for HTTPS |
-| **Apache** | VirtualHost-based, uses mkcert for HTTPS |
+|---|---|
+| **Caddy** *(recommended)* | Auto HTTPS via internal TLS · hot-reload via Admin API |
+| **Nginx** | Familiar config · uses mkcert for HTTPS |
+| **Apache** | VirtualHost-based · uses mkcert for HTTPS |
 
 ---
 
-## Docker Support
+## TLD Options
 
-ODINS works seamlessly with Docker projects:
+| TLD | Notes |
+|---|---|
+| `.odin` | Thematic, no conflicts — **default** |
+| `.odins` | Thematic variant |
+| `.test` | IANA reserved for testing |
+| `.dev` | Popular · HTTPS required (Caddy handles it) |
+| `.lan` | Common in local networks |
+| `.internal` | Enterprise-style |
+| `.local` | ⚠️ mDNS conflict on macOS — use with caution |
 
-```toml
-[[routes]]
-subdomain = "api"
-port = 3000
-docker_container = "my_api_container"
+---
+
+## Multi-Language Support
+
+ODINS auto-detects your system language:
+
+```bash
+LANG=en_US.UTF-8 odins ls   # English
+LANG=es_ES.UTF-8 odins ls   # Español
+LANG=pt_BR.UTF-8 odins ls   # Português
 ```
 
-If the container exposes port 3000 to the host, ODINS proxies to `localhost:3000`. The TUI dashboard shows a `○` dot when the container is stopped.
+Override in `~/.config/odins/config.toml`:
 
----
-
-## HTTPS
-
-- **Caddy**: Uses Caddy's built-in TLS (automatically trusted after `odins init`)
-- **Nginx/Apache**: Uses [mkcert](https://github.com/FiloSottile/mkcert) — installed automatically
-
-After `odins init`, all `*.odin` (or your chosen TLD) domains are HTTPS by default — no browser warnings.
+```toml
+language = "en"   # "pt" | "en" | "es"
+```
 
 ---
 
@@ -186,18 +284,21 @@ After `odins init`, all `*.odin` (or your chosen TLD) domains are HTTPS by defau
 
 ```
 Browser → *.rankly.odin
-             ↓ (dnsmasq wildcard → 127.0.0.1)
-         Reverse Proxy :443
-         (Caddy / Nginx / Apache)
-             ↓
-         localhost:3000  (your app)
+               ↓
+         dnsmasq :5300   (wildcard *.odin → 127.0.0.1)
+               ↓
+         /etc/resolver/odin  (macOS resolver)
+               ↓
+         Caddy :443 / :80  (reverse proxy + HTTPS)
+               ↓
+         localhost:<port>  (your app)
 ```
 
-- **DNS**: dnsmasq via Homebrew on port 5353, `/etc/resolver/<tld>` for macOS
-- **Proxy**: Caddy/Nginx/Apache managed by ODINS
-- **HTTPS**: Caddy internal TLS or mkcert, trusted in macOS keychain
-- **State**: `~/.local/share/odins/routes.json`
-- **Config**: `~/.config/odins/config.toml`
+- **DNS** — dnsmasq via Homebrew on port `5300`, `/etc/resolver/<tld>` for macOS routing
+- **Proxy** — Caddy / Nginx / Apache managed entirely by ODINS
+- **HTTPS** — Caddy internal TLS (auto-trusted) or mkcert for Nginx/Apache
+- **State** — `~/Library/Application Support/odins/routes.json`
+- **Config** — `~/.config/odins/config.toml`
 
 ---
 
@@ -205,26 +306,26 @@ Browser → *.rankly.odin
 
 **DNS not resolving?**
 ```bash
+odins doctor
 brew services restart dnsmasq
-scutil --dns | grep odin   # should show nameserver 127.0.0.1
+scutil --dns | grep odin   # should show nameserver 127.0.0.1, port 5300
 ```
 
 **Caddy not starting?**
 ```bash
+odins doctor --json
 brew services restart caddy
-curl http://localhost:2019/config/   # Caddy Admin API
+curl http://localhost:2019/config/
 ```
 
-**Certificate not trusted?**
+**Certificate not trusted in browser?**
 ```bash
-# For Caddy:
-sudo security add-trusted-cert -d -r trustRoot \
-  -k /Library/Keychains/System.keychain \
-  ~/.local/share/caddy/pki/authorities/local/root.crt
-
-# For mkcert:
-mkcert -install
+# Run this once — opens macOS auth dialog
+odins init
 ```
+
+**Route missing after Caddy restart?**
+Routes are automatically re-synced from state on every `odins` command. Just run any `odins` command to restore.
 
 **Port 80/443 already in use?**
 ```bash
@@ -233,6 +334,34 @@ sudo lsof -i :80 -i :443
 
 ---
 
-## License
+## Contributing
 
-MIT © [Adialá Leal](https://github.com/adialaleal)
+ODINS is open source and contributions are very welcome! See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the full guide.
+
+**Quick start for contributors:**
+
+```bash
+git clone https://github.com/adialaleal/odins
+cd odins
+go mod tidy
+go build -o odins .
+./odins --help
+```
+
+**Good first issues** are labeled [`good first issue`](https://github.com/adialaleal/odins/issues?q=label%3A%22good+first+issue%22) on GitHub.
+
+---
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for the full history.
+
+---
+
+<div align="center">
+
+MIT © [Adialá Leal](https://github.com/adialaleal) · Built with [Go](https://go.dev) + [Bubble Tea](https://github.com/charmbracelet/bubbletea) + [Caddy](https://caddyserver.com)
+
+*If ODINS saves you time, consider giving it a ⭐*
+
+</div>

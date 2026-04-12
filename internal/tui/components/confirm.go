@@ -1,6 +1,7 @@
 package components
 
 import (
+	"github.com/adialaleal/odins/internal/i18n"
 	"github.com/adialaleal/odins/internal/tui/styles"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -13,8 +14,8 @@ func ConfirmModal(width int, message string) string {
 		"",
 		lipgloss.JoinHorizontal(
 			lipgloss.Top,
-			styles.FooterKey.Render("[y]")+" confirmar  ",
-			styles.FooterKey.Render("[n]")+" cancelar",
+			styles.FooterKey.Render("[y]")+" "+i18n.T("modal.confirm")+"  ",
+			styles.FooterKey.Render("[n]")+" "+i18n.T("modal.cancel"),
 		),
 	)
 

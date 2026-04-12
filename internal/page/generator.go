@@ -3,13 +3,13 @@ package page
 
 import (
 	"bytes"
-	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
 	"text/template"
 	"time"
 
+	"github.com/adialaleal/odins/internal/i18n"
 	"github.com/adrg/xdg"
 )
 
@@ -31,6 +31,12 @@ type PageData struct {
 	Description string
 	Routes      []RouteInfo
 	GeneratedAt string
+	// i18n strings (populated by Generate)
+	Tagline      string
+	EmptyState   string
+	GeneratedBy  string
+	ServiceWord  string // "service" / "serviço" / "servicio"
+	ServicesWord string // plural
 }
 
 // PagesDir returns the base directory for all domain landing pages.
@@ -52,6 +58,13 @@ func Generate(data PageData) error {
 	if data.Title == "" {
 		data.Title = data.FQDN
 	}
+
+	// Populate i18n strings
+	data.Tagline = i18n.T("page.tagline")
+	data.EmptyState = fmt.Sprintf(i18n.T("page.empty_state"))
+	data.GeneratedBy = i18n.T("page.generated_by")
+	data.ServiceWord = i18n.T("page.services")
+	data.ServicesWord = i18n.T("page.services_pl")
 
 	tmpl, err := template.New("page").Parse(htmlTemplate)
 	if err != nil {
@@ -234,17 +247,14 @@ const htmlTemplate = `<!DOCTYPE html>
     {{if .Description}}<div class="domain-desc">{{.Description}}</div>{{end}}
   </div>
   <div class="header-meta">
-    The All-Father of Local DNS<br>
-    <span class="badge-count" id="count">{{len .Routes}} service{{if ne (len .Routes) 1}}s{{end}}</span>
+    {{.Tagline}}<br>
+    <span class="badge-count" id="count">{{len .Routes}} {{if eq (len .Routes) 1}}{{.ServiceWord}}{{else}}{{.ServicesWord}}{{end}}</span>
   </div>
 </header>
 
 <div class="services">
   {{if not .Routes}}
-  <div class="empty">
-    Nenhum serviço ainda.<br>
-    Adicione projetos com <code>odins up --domain {{.Domain}}</code>
-  </div>
+  <div class="empty">{{.EmptyState}}</div>
   {{else}}
   {{range .Routes}}
   <a class="card" id="card-{{.Subdomain}}" href="https://{{.FQDN}}" target="_blank">
@@ -261,7 +271,7 @@ const htmlTemplate = `<!DOCTYPE html>
 </div>
 
 <footer>
-  Gerado por <a href="https://github.com/adialaleal/odins">ODINS</a>
+  {{.GeneratedBy}} <a href="https://github.com/adialaleal/odins">ODINS</a>
   &nbsp;·&nbsp; {{.GeneratedAt}}
 </footer>
 

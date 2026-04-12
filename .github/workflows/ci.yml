@@ -21,6 +21,9 @@ jobs:
       - name: Tidy
         run: go mod tidy
 
+      - name: AI Pack Check
+        run: go run ./tools/ai-pack-gen --check
+
       - name: Vet
         run: go vet ./...
 
