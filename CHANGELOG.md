@@ -11,6 +11,22 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.9.0] - 2026-04-12
+
+### Added
+- **MCP Server** (`odins mcp`) — Expose all ODINS operations via Model Context Protocol over stdio; 13 tools + 3 resources serving Claude Code, VS Code Copilot, Cursor, Codex CLI, and Gemini CLI simultaneously
+- **Project Scanner** (`odins scan`) — Walk directory trees to detect projects, maintain global index at `~/.config/odins/projects.json`; supports `--max-depth`, `--create-odins`, and `--json`
+- **AI Client Auto-Config** — After `odins init`, detect installed AI tools and write MCP server configuration to each tool's settings file
+- **Docker Compose Detection** — Parse `docker-compose.yml` to extract service names and host-mapped ports during `odins detect`
+- **`odins version`** — Detailed build info subcommand with `--json` support
+- **`odins completion`** — Shell autocompletion for bash, zsh, and fish
+- **`odins open`** — Open FQDN in default browser, infers domain from `.odins` context
+
+### Fixed
+- **Docker stubs** — Replace non-functional `dockerSocketExists()` and `FindContainerPort()` with real `docker info` and `docker port` CLI implementations
+
+---
+
 ## [0.8.1] - 2026-04-12
 
 ### Fixed
