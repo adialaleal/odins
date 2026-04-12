@@ -96,9 +96,13 @@ func syncCaddyFromState() {
 	}
 }
 
+// buildVersion stores the raw version fields for use in subcommands.
+var buildVersion, buildCommit, buildDate string
+
 // SetVersion wires version info injected by GoReleaser into the Cobra root command.
 // Cobra automatically adds --version / -v when Version is non-empty.
 func SetVersion(v, c, d string) {
+	buildVersion, buildCommit, buildDate = v, c, d
 	rootCmd.Version = fmt.Sprintf("%s (commit: %s, built: %s)", v, c, d)
 }
 
@@ -142,6 +146,11 @@ func init() {
 		detectCmd,
 		doctorCmd,
 		welcomeCmd,
+		versionCmd,
+		completionCmd,
+		openCmd,
+		scanCmd,
+		mcpCmd,
 	)
 }
 
@@ -180,4 +189,6 @@ func resetCLIState() {
 	domainTitle = ""
 	domainDesc = ""
 	detectDir = ""
+	scanMaxDepth = 3
+	scanCreateOdins = false
 }
