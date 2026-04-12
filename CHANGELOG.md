@@ -11,6 +11,18 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.8.1] - 2026-04-12
+
+### Fixed
+- **SSL/HTTPS for Nginx/Apache** — `odins up` now generates mkcert certificates before creating vhosts; previously, vhost templates referenced `.pem` files that were never created, breaking HTTPS for non-Caddy backends
+- **Doctor certificate validation** — `odins doctor` now checks that each active route has its corresponding `.pem` and `-key.pem` files (nginx/apache), reporting which certificates are missing instead of only verifying the certs directory exists
+- **TUI silent errors** — `SaveProject` and `store.Save()` failures in the TUI now propagate via `UpDoneMsg` instead of being silently discarded
+- **Startup sync error** — `SyncRoutes` failure on Caddy startup now logs a warning to stderr instead of being silently ignored
+- **Nginx health check** — replaced fragile `brew services list` output parsing with `pgrep -x nginx` for reliable process detection
+- **Apache health check** — replaced loose `apachectl status` output check with `pgrep -x httpd`
+
+---
+
 ## [0.8.0] - 2026-04-06
 
 ### Added
