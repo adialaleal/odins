@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
+	"github.com/adialaleal/odins/internal/aiclient"
 	"github.com/adialaleal/odins/internal/config"
 	"github.com/adialaleal/odins/internal/service"
 	"github.com/spf13/cobra"
@@ -90,6 +92,12 @@ func runInit(cmd *cobra.Command, args []string) error {
 	writeTextLine(out, "    cd meu-projeto && odins up")
 	writeTextLine(out, "    odins doctor")
 	writeTextLine(out, "")
+
+	// AI client auto-configuration.
+	if !initNonInteractive && isInteractiveIO() {
+		configureAIClients(out)
+	}
+
 	return nil
 }
 
@@ -118,6 +126,38 @@ func chooseTLD() string {
 		}
 	}
 	return config.SupportedTLDs[0].TLD
+}
+
+func configureAIClients(out io.Writer) {
+	clients := aiclient.DetectClients()
+	if len(clients) == 0 {
+		return
+	}
+
+	writeTextLine(out, "  AI Tools detectados:")
+	for _, c := range clients {
+		writeTextLine(out, "    • %s", c.Name)
+	}
+	writeTextLine(out, "")
+	fmt.Fprint(os.Stdout, "  Configurar integração MCP para essas ferramentas? [Y/n] ")
+
+	var input string
+	fmt.Scanln(&input)
+	input = strings.TrimSpace(strings.ToLower(input))
+
+	if input != "" && input != "y" && input != "s" && input != "sim" && input != "yes" {
+		return
+	}
+
+	results := aiclient.ConfigureAll(clients)
+	for _, r := range results {
+		if r.Error != "" {
+			writeTextLine(out, "    ⚠  %s: %s", r.Client, r.Error)
+		} else if r.Configured {
+			writeTextLine(out, "    ✓ %s → %s", r.Client, r.ConfigPath)
+		}
+	}
+	writeTextLine(out, "")
 }
 
 func chooseBackend() string {
