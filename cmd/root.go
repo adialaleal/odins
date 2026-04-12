@@ -91,7 +91,9 @@ func syncCaddyFromState() {
 		}
 	}
 
-	_ = client.SyncRoutes(store.Routes, domainPages)
+	if err := client.SyncRoutes(store.Routes, domainPages); err != nil {
+		fmt.Fprintf(os.Stderr, "aviso: falha ao sincronizar rotas com o Caddy: %v\n", err)
+	}
 }
 
 // SetVersion wires version info injected by GoReleaser into the Cobra root command.

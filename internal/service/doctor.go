@@ -126,7 +126,10 @@ func (m *Manager) Doctor() (DoctorResult, []string, error) {
 		Action:  "Inicie ou reinicie o proxy configurado e rode `odins doctor` novamente.",
 	})
 
-	certOK, certDetails, certAction := m.certificateCheck(cfg)
+	storePath := filepath.Join(xdg.DataHome, "odins", "routes.json")
+	store, loadErr := state.Load()
+
+	certOK, certDetails, certAction := m.certificateCheck(cfg, store)
 	addCheck(DoctorCheck{
 		Name:    "certificates",
 		OK:      certOK,
@@ -134,9 +137,6 @@ func (m *Manager) Doctor() (DoctorResult, []string, error) {
 		Details: certDetails,
 		Action:  certAction,
 	})
-
-	storePath := filepath.Join(xdg.DataHome, "odins", "routes.json")
-	store, loadErr := state.Load()
 	storeOK := loadErr == nil
 	storeDetails := "Store carregado com sucesso."
 	if !m.rt.FileExists(storePath) {
@@ -172,7 +172,7 @@ func (m *Manager) proxyRunning(backend config.ProxyBackend) bool {
 	}
 }
 
-func (m *Manager) certificateCheck(cfg config.GlobalConfig) (bool, string, string) {
+func (m *Manager) certificateCheck(cfg config.GlobalConfig, store *state.Store) (bool, string, string) {
 	switch cfg.ProxyBackend {
 	case config.BackendCaddy:
 		path := m.rt.CaddyCAPath()
@@ -191,8 +191,26 @@ func (m *Manager) certificateCheck(cfg config.GlobalConfig) (bool, string, strin
 				"O diretório de certificados do mkcert ainda não existe em " + certDir + ".",
 				"Rode `odins init` ou gere um certificado mkcert para o domínio desejado."
 		}
+		if store == nil || len(store.Routes) == 0 {
+			return true,
+				"Diretório de certificados encontrado em " + certDir + ". Nenhuma rota ativa para verificar.",
+				""
+		}
+		var missing []string
+		for _, r := range store.Routes {
+			certFile := filepath.Join(certDir, r.Subdomain+".pem")
+			keyFile := filepath.Join(certDir, r.Subdomain+"-key.pem")
+			if !m.rt.FileExists(certFile) || !m.rt.FileExists(keyFile) {
+				missing = append(missing, r.Subdomain)
+			}
+		}
+		if len(missing) > 0 {
+			return false,
+				"Certificados ausentes para: " + strings.Join(missing, ", "),
+				"Rode `odins up` para gerar os certificados faltantes ou `mkcert` manualmente."
+		}
 		return true,
-			"Diretório de certificados encontrado em " + certDir,
+			"Todos os certificados das rotas ativas encontrados em " + certDir,
 			""
 	}
 }

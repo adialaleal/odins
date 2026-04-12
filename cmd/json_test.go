@@ -91,6 +91,7 @@ func TestDoctorJSONGolden(t *testing.T) {
 			SudoTrustCA:          func(string) error { return nil },
 			CaddyCAPath:          func() string { return filepath.Join(tmpRoot, "caddy", "root.crt") },
 			InstallMkcertCA:      func() error { return nil },
+			IssueMkcert:          func(string) error { return nil },
 			ResolverPath:         func(string) string { return "/tmp/odins-test/resolver/odin" },
 			FileExists: func(path string) bool {
 				switch {

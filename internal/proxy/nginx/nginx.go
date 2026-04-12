@@ -23,16 +23,7 @@ func (b *Backend) IsInstalled() bool {
 }
 
 func (b *Backend) IsRunning() bool {
-	out, err := exec.Command("brew", "services", "list").Output()
-	if err != nil {
-		return false
-	}
-	for _, line := range splitLines(string(out)) {
-		if len(line) > 0 && line[0] == "nginx" && line[1] == "started" {
-			return true
-		}
-	}
-	return false
+	return exec.Command("pgrep", "-x", "nginx").Run() == nil
 }
 
 func (b *Backend) Install() error { return nil }
@@ -97,47 +88,3 @@ func runBrewService(action, service string) error {
 	return nil
 }
 
-func splitLines(s string) [][]string {
-	var result [][]string
-	for _, line := range splitStr(s, "\n") {
-		fields := splitFields(line)
-		if len(fields) >= 2 {
-			result = append(result, fields)
-		}
-	}
-	return result
-}
-
-func splitStr(s, sep string) []string {
-	var out []string
-	start := 0
-	for i := 0; i < len(s); i++ {
-		if s[i] == sep[0] {
-			out = append(out, s[start:i])
-			start = i + 1
-		}
-	}
-	out = append(out, s[start:])
-	return out
-}
-
-func splitFields(s string) []string {
-	var out []string
-	start := -1
-	for i, c := range s {
-		if c != ' ' && c != '\t' {
-			if start == -1 {
-				start = i
-			}
-		} else {
-			if start != -1 {
-				out = append(out, s[start:i])
-				start = -1
-			}
-		}
-	}
-	if start != -1 {
-		out = append(out, s[start:])
-	}
-	return out
-}
