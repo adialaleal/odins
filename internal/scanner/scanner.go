@@ -143,7 +143,12 @@ func Scan(opts ScanOptions) (ScanResult, error) {
 			return nil
 		}
 
-		detectedPaths[path] = true
+		// Only mark projects with known runtime as "detected" so their
+		// subtrees are skipped. Compose-only / unknown-runtime roots must
+		// remain open so child projects inside them are still found.
+		if detected.Runtime != "unknown" {
+			detectedPaths[path] = true
+		}
 
 		hasOdins := config.ExistsProject(path)
 		project := ScannedProject{
@@ -179,7 +184,14 @@ func Scan(opts ScanOptions) (ScanResult, error) {
 		}
 
 		result.Projects = append(result.Projects, project)
-		return filepath.SkipDir // skip subtree of detected project
+
+		// Skip subtree for real projects (known runtime) to avoid
+		// detecting sub-packages. But for compose-only / unknown-runtime
+		// roots, keep walking so child projects are found.
+		if detected.Runtime != "unknown" {
+			return filepath.SkipDir
+		}
+		return nil
 	})
 
 	return result, nil
